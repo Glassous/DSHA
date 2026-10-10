@@ -68,6 +68,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.glassous.dsha.R
 import com.glassous.dsha.data.Profile
 import com.glassous.dsha.ui.theme.BrandGradient
+import com.glassous.dsha.ui.transition.SharedElementKey
+import com.glassous.dsha.ui.transition.containerTransformSource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,6 +84,9 @@ fun ProfileListScreen(
     var pendingDelete by remember { mutableStateOf<Profile?>(null) }
     // 列表已按最近使用时间倒序（上次启动的置顶），首个有过启动记录的组即"上次启动"
     val lastLaunchedId = profiles.firstOrNull { it.lastUsedAt > 0L }?.id
+    // 新增连接入口（悬浮按钮与空状态按钮互斥出现，共用同一个共享元素 key）：
+    // 点击后按钮的圆角方块展开成"新建连接组"页的整页容器
+    val newProfileContainer = Modifier.containerTransformSource(SharedElementKey.NewProfileContainer)
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -119,6 +124,7 @@ fun ProfileListScreen(
                         focusedElevation = 0.dp,
                         hoveredElevation = 0.dp,
                     ),
+                    modifier = newProfileContainer,
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Add,
@@ -131,6 +137,7 @@ fun ProfileListScreen(
         if (profiles.isEmpty()) {
             EmptyState(
                 onNew = onNew,
+                newProfileModifier = newProfileContainer,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
@@ -261,7 +268,11 @@ private fun LastLaunchedBadge() {
 }
 
 @Composable
-private fun EmptyState(onNew: () -> Unit, modifier: Modifier = Modifier) {
+private fun EmptyState(
+    onNew: () -> Unit,
+    newProfileModifier: Modifier = Modifier,
+    modifier: Modifier = Modifier,
+) {
     val outline = MaterialTheme.colorScheme.outline
     Column(
         modifier = modifier.padding(horizontal = 40.dp),
@@ -309,7 +320,7 @@ private fun EmptyState(onNew: () -> Unit, modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(24.dp))
-        Button(onClick = onNew) {
+        Button(onClick = onNew, modifier = newProfileModifier) {
             Text(stringResource(R.string.action_new_profile))
         }
     }
