@@ -1,8 +1,10 @@
 package com.glassous.dsha.ui.web
 
+import android.app.Activity
 import android.webkit.WebView
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +39,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -46,11 +49,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 import com.glassous.dsha.R
 import com.glassous.dsha.ui.dshaViewModel
 
@@ -74,15 +80,35 @@ fun WebScreen(
     val profile = viewModel.profile
     val startUrl = viewModel.startUrl
 
-    // 顶部不再让网页伸入状态栏：状态栏区域由与网页背景同色的色块填充，网页从其下方开始；
-    // 底部仍由网页自行避让导航栏（小白条），键盘弹出时 WebView 已整体上移，不再重复避让。
+    // 顶栏沉浸：网页直接铺满整屏（含状态栏区域），顶部与底部的安全距离都注入网页内部，
+    // 由 html 的 padding 承担（border-box，页面总高不变，因此不会多出上下滚动）。
+    // 网页 viewport 为 initial-scale=1，1 CSS px = 1 dp，故这里下发的必须是 dp 值。
     val density = LocalDensity.current
-    val statusBarHeight = with(density) { WindowInsets.statusBars.getTop(density).toDp() }
-    val navBarsBottomPx = WindowInsets.navigationBars.getBottom(density)
-    val imeBottomPx = WindowInsets.ime.getBottom(density)
-    val bottomInsetPx = if (imeBottomPx > navBarsBottomPx) 0 else navBarsBottomPx
-    // 网页背景色（从页面顶部实时采样）；WebView 初始是白底，首次采样到之前先用白色兜底
+    val safeTopDp = with(density) { WindowInsets.statusBars.getTop(density).toDp().value }
+    val navBarsBottomDp = with(density) { WindowInsets.navigationBars.getBottom(density).toDp().value }
+    val imeBottomDp = with(density) { WindowInsets.ime.getBottom(density).toDp().value }
+    // 键盘弹出时 WebView 已整体上移，不再重复避让底部导航栏
+    val safeBottomDp = if (imeBottomDp > navBarsBottomDp) 0f else navBarsBottomDp
+    // 网页顶部背景色（实时采样）；WebView 初始是白底，首次采样到之前先用白色兜底
     var webBackground by remember { mutableStateOf(Color.White) }
+
+    // 沉浸后状态栏直接浮在网页之上，图标明暗必须跟随网页背景而不是应用主题；
+    // 离开本页时再交还给应用主题（否则会影响其它页面）。
+    val view = LocalView.current
+    val appDark = isSystemInDarkTheme()
+    if (!view.isInEditMode) {
+        DisposableEffect(webBackground, appDark) {
+            val window = (view.context as? Activity)?.window
+            val controller = window?.let { WindowCompat.getInsetsController(it, view) }
+            val lightIcons = webBackground.luminance() > 0.5f
+            controller?.isAppearanceLightStatusBars = lightIcons
+            controller?.isAppearanceLightNavigationBars = lightIcons
+            onDispose {
+                controller?.isAppearanceLightStatusBars = !appDark
+                controller?.isAppearanceLightNavigationBars = !appDark
+            }
+        }
+    }
 
     LaunchedEffect(messageRes) {
         messageRes?.let { res ->
@@ -110,8 +136,8 @@ fun WebScreen(
                 modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars),
             )
         },
-        // 顶部与底部都不在此预留：状态栏区域由色块填充（网页从其下方开始），
-        // 底部由注入网页的安全距离保证内容不被小白条遮挡；左右仍避让挖孔区。
+        // 顶栏沉浸：顶部不在此预留，网页铺满整屏（含状态栏区域）；
+        // 底部由注入网页内部的底部安全距离保证内容不被小白条遮挡；左右仍避让挖孔区。
         contentWindowInsets = WindowInsets.systemBars.only(WindowInsetsSides.Horizontal),
     ) { innerPadding ->
         val currentProfile = profile
@@ -140,23 +166,13 @@ fun WebScreen(
                         .padding(innerPadding)
                         .imePadding(),
                 ) {
-                    // 状态栏区域：用与网页背景同色的不透明色块填充，
-                    // 网页本身不伸入顶栏，也就不会被拉伸或重排。
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .fillMaxWidth()
-                            .height(statusBarHeight)
-                            .background(webBackground),
-                    )
-
                     DshaWebView(
                         profile = currentProfile,
                         startUrl = currentStartUrl,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(top = statusBarHeight),
-                        bottomInsetPx = bottomInsetPx,
+                        // 铺满整屏（含状态栏区域）：顶部安全高度由注入网页内部的 html padding 承担
+                        modifier = Modifier.fillMaxSize(),
+                        safeTopDp = safeTopDp,
+                        safeBottomDp = safeBottomDp,
                         onWebViewCreated = { created -> webView = created },
                         onBackgroundColor = { color -> webBackground = color },
                         onProgress = { value -> viewModel.progress = value },

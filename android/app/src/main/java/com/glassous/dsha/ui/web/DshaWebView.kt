@@ -42,6 +42,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.glassous.dsha.data.Profile
 import com.glassous.dsha.data.UrlUtils
+import java.util.Locale
 import kotlinx.coroutines.delay
 import org.json.JSONObject
 
@@ -61,13 +62,17 @@ enum class WebEvent {
 /**
  * 网页壳本体。WebView 只在 [remember] 中创建一次，
  * 因此调用方需要保证同一个实例只服务同一个连接组（用 `key(profile.id)` 包一层即可）。
+ *
+ * @param safeTopDp 状态栏高度（dp）：作为顶部安全距离注入网页内部，顶栏图案才能伸到状态栏底下
+ * @param safeBottomDp 导航栏高度（dp）：注入网页内部的底部安全距离；软键盘弹出时传 0（那时视图已被抬起）
  */
 @Composable
 fun DshaWebView(
     profile: Profile,
     startUrl: String,
     modifier: Modifier = Modifier,
-    bottomInsetPx: Int = 0,
+    safeTopDp: Float = 0f,
+    safeBottomDp: Float = 0f,
     onWebViewCreated: (WebView) -> Unit = {},
     onProgress: (Int) -> Unit = {},
     onCanGoBackChanged: (Boolean) -> Unit = {},
@@ -84,7 +89,8 @@ fun DshaWebView(
     val onEventState = rememberUpdatedState(onEvent)
     val onCreatedState = rememberUpdatedState(onWebViewCreated)
     val onBackgroundColorState = rememberUpdatedState(onBackgroundColor)
-    val bottomInsetState = rememberUpdatedState(bottomInsetPx)
+    val safeTopState = rememberUpdatedState(safeTopDp)
+    val safeBottomState = rememberUpdatedState(safeBottomDp)
 
     val fileLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -114,7 +120,8 @@ fun DshaWebView(
                 context = context,
                 profile = profile,
                 alive = alive,
-                bottomInset = { bottomInsetState.value },
+                safeTop = { safeTopState.value },
+                safeBottom = { safeBottomState.value },
                 onCanGoBack = { value -> onCanGoBackState.value(value) },
                 onLoadError = { failed -> onLoadErrorState.value(failed) },
                 onBackgroundColor = { color -> onBackgroundColorState.value(color) },
@@ -152,13 +159,15 @@ fun DshaWebView(
         webView.loadUrl(startUrl)
     }
 
-    // 导航栏/键盘高度变化时同步更新网页底部的安全距离
-    LaunchedEffect(webView, bottomInsetPx) {
-        if (measuredSize.value == null) return@LaunchedEffect
-        applyBottomInset(webView, bottomInsetPx)
+    // 状态栏/导航栏/键盘高度变化（旋转、折叠屏、软键盘）时同步刷新注入。
+    // 首次加载由 onPageFinished 负责（那时页面才存在），这里只在尺寸确定后跟随 Insets 变化。
+    LaunchedEffect(webView, size, safeTopDp, safeBottomDp) {
+        if (size == null) return@LaunchedEffect
+        applyMobileAdapt(webView, safeTopDp, safeBottomDp)
+        applyBottomInset(webView, safeBottomDp)
     }
 
-    // 顶栏色块要实时跟随网页背景：深浅主题切换、无刷新跳转都可能改底色，
+    // 状态栏图标的明暗要实时跟随网页顶部背景：深浅主题切换、无刷新跳转都可能改底色，
     // 因此持续采样；颜色稳定后放慢频率，颜色变化才向上抛出（避免无谓重组）。
     LaunchedEffect(webView) {
         var last: Color? = null
@@ -169,7 +178,7 @@ fun DshaWebView(
                 else BACKGROUND_SAMPLE_INTERVAL_MS,
             )
             if (measuredSize.value == null) continue
-            sampleBackgroundColor(webView) { color ->
+            sampleBackgroundColor(webView, safeTopState.value) { color ->
                 if (color == last) {
                     stableRounds++
                 } else {
@@ -208,7 +217,13 @@ private const val DIALOG_VIEWPORT_MARGIN_PX = 48
 private const val BOTTOM_INSET_STYLE_ID = "dsha-bottom-inset-style"
 private const val BOTTOM_INSET_VAR = "--dsha-safe-bottom"
 
-/** 顶栏色块采样网页背景色的节奏：颜色未稳定时密集采样，稳定后降频。 */
+/**
+ * 注入网页的尺寸一律用 dp：网页 viewport 为 `width=device-width, initial-scale=1`，
+ * 即 1 CSS px = 1 dp；传物理像素会在高密度屏上被放大 2~3 倍。
+ */
+private fun fmtDp(value: Float): String = String.format(Locale.US, "%.2f", value)
+
+/** 网页顶部背景色的采样节奏：颜色未稳定时密集采样，稳定后降频。 */
 private const val BACKGROUND_SAMPLE_INTERVAL_MS = 500L
 private const val BACKGROUND_IDLE_SAMPLE_INTERVAL_MS = 2_000L
 private const val STABLE_BACKGROUND_ROUNDS = 4
@@ -223,6 +238,10 @@ private const val STABLE_BACKGROUND_ROUNDS = 4
  *    整条链塌成 0，界面只剩溢出可见；
  * 2. 它的弹窗卡片是 `width: min(380px, 100%)` + `max-height: 100%`，同样会被算成 0 尺寸，
  *    表现为"只看到背景模糊、看不到弹窗面板"（遮罩用的是 inset 拉伸，所以它没事）。
+ *
+ * 高度链失效时只能用 JS 量到的像素值兜底，此时 `100%` 不再生效，注入的安全高度
+ * （[applyMobileAdapt] 写在 html 上的 padding，由 --dsha-safe-* 暴露）必须显式扣掉，
+ * 否则 body/#root 会撑出多余的可滚动空白。
  */
 private val SHELL_COMPAT_JS = """
     (function () {
@@ -233,13 +252,23 @@ private val SHELL_COMPAT_JS = """
         var height = Math.round(window.innerHeight || 0);
         if (height <= 0) { height = Math.round(html.clientHeight || 0); }
 
+        var readInset = function (name) {
+          try {
+            var n = parseFloat(getComputedStyle(html).getPropertyValue(name));
+            return isNaN(n) ? 0 : n;
+          } catch (e) { return 0; }
+        };
+        var insetGap = function () {
+          return Math.max(Math.round(readInset('--dsha-safe-top') + readInset('--dsha-safe-bottom')), 0);
+        };
+
         var applyRootHeight = function () {
           var h = Math.round(window.innerHeight || height);
           if (h <= 0) { return; }
-          var px = h + 'px';
-          html.style.setProperty('height', px, 'important');
-          if (body !== null) { body.style.setProperty('height', px, 'important'); }
-          if (root !== null) { root.style.setProperty('height', px, 'important'); }
+          var inner = Math.max(h - insetGap(), 0) + 'px';
+          html.style.setProperty('height', h + 'px', 'important');
+          if (body !== null) { body.style.setProperty('height', inner, 'important'); }
+          if (root !== null) { root.style.setProperty('height', inner, 'important'); }
         };
 
         var collapsed = height > 0 && (
@@ -319,7 +348,8 @@ private fun buildWebViewClient(
     context: Context,
     profile: Profile,
     alive: MutableState<Boolean>,
-    bottomInset: () -> Int,
+    safeTop: () -> Float,
+    safeBottom: () -> Float,
     onCanGoBack: (Boolean) -> Unit,
     onLoadError: (Boolean) -> Unit,
     onBackgroundColor: (Color) -> Unit,
@@ -370,9 +400,11 @@ private fun buildWebViewClient(
         onCanGoBack(view.canGoBack())
         scheduleAutoFill(view, profile, alive, attempt = 0, onFallback = { onEvent(WebEvent.AUTOFILL_FALLBACK) })
         applyShellCompat(view)
-        applyBottomInset(view, bottomInset())
-        // 每次整页加载完成后重新采样：顶栏色块要与网页背景保持一致
-        sampleBackgroundColor(view, onBackgroundColor)
+        // 顶栏沉浸 + 手机端适配：样式节点按 id 复用，整页加载后重刷一遍数值
+        applyMobileAdapt(view, safeTop(), safeBottom())
+        applyBottomInset(view, safeBottom())
+        // 每次整页加载完成后重新采样：状态栏图标明暗要跟随网页顶部背景
+        sampleBackgroundColor(view, safeTop(), onBackgroundColor)
     }
 
     override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
@@ -493,20 +525,20 @@ private fun applyShellCompat(webView: WebView) {
  * 做法是给 `html` 加 padding-bottom，并用 border-box 让它计入 100% 高度；
  * DSH 前端的 `html`、`body`、`#root` 逐级 100% 的高度链会跟着整体内缩，
  * 而不是被撑出多余滚动。同时暴露 --dsha-safe-bottom 供页面自行取值。
- * 顶部不做注入：状态栏区域由应用侧用与网页背景同色的色块填充，网页本身不伸入顶栏。
+ * 顶部安全距离（状态栏）由 [applyMobileAdapt] 一并注入，单位同为此处的 dp。
  */
-private fun applyBottomInset(webView: WebView, bottomInsetPx: Int) {
-    webView.evaluateJavascript(buildBottomInsetScript(bottomInsetPx)) { result ->
-        Log.d(TAG, "底部安全距离 ${bottomInsetPx}px: ${result?.trim('"')}")
+private fun applyBottomInset(webView: WebView, bottomInsetDp: Float) {
+    webView.evaluateJavascript(buildBottomInsetScript(bottomInsetDp)) { result ->
+        Log.d(TAG, "底部安全距离 ${fmtDp(bottomInsetDp)}dp: ${result?.trim('"')}")
     }
 }
 
-private fun buildBottomInsetScript(bottomInsetPx: Int): String = """
+private fun buildBottomInsetScript(bottomInsetDp: Float): String = """
     (function () {
       try {
         var root = document.documentElement;
         if (!root) { return 'nopage'; }
-        var bottom = $bottomInsetPx;
+        var bottom = ${fmtDp(bottomInsetDp)};
         var style = document.getElementById('$BOTTOM_INSET_STYLE_ID');
         if (!style) {
           style = document.createElement('style');
@@ -526,14 +558,17 @@ private fun buildBottomInsetScript(bottomInsetPx: Int): String = """
 """.trimIndent()
 
 /**
- * 采样网页自身的背景色，供应用侧绘制状态栏区域的色块（避免网页伸入顶栏）。
+ * 采样网页顶部背景色，用于决定状态栏图标的明暗（沉浸后状态栏直接浮在网页上）。
  *
  * 取页面顶边中间位置的元素，沿祖先链找第一个不透明背景，与浏览器实际的叠色顺序一致；
  * 整条链都透明时按 WebView 默认白底处理。半透明色按白色底合成，
  * 页面用深色主题、而后端仍是白底等情况都能拿到真实颜色。
+ *
+ * 采样点要避开注入给 `html` 的顶部 padding（那一带露出的是画布背景，命中的是 html 自身），
+ * 所以从安全高度往下 2px 取点；抽屉展开时该点自然落在侧栏上，图标随之切换也符合预期。
  */
-private fun sampleBackgroundColor(webView: WebView, onResult: (Color) -> Unit) {
-    webView.evaluateJavascript(BACKGROUND_COLOR_JS) { raw ->
+private fun sampleBackgroundColor(webView: WebView, safeTopDp: Float, onResult: (Color) -> Unit) {
+    webView.evaluateJavascript(buildBackgroundColorScript(safeTopDp)) { raw ->
         val parts = raw?.trim('"').orEmpty().split(',')
         if (parts.size != 3) return@evaluateJavascript
         val rgb = parts.mapNotNull { it.trim().toIntOrNull() }
@@ -542,7 +577,7 @@ private fun sampleBackgroundColor(webView: WebView, onResult: (Color) -> Unit) {
     }
 }
 
-private const val BACKGROUND_COLOR_JS = """
+private fun buildBackgroundColorScript(safeTopDp: Float): String = """
     (function () {
       try {
         function parse(color) {
@@ -563,7 +598,8 @@ private const val BACKGROUND_COLOR_JS = """
         }
         var node = null;
         try {
-          node = document.elementFromPoint(Math.floor(window.innerWidth / 2), 3);
+          var y = Math.round(${fmtDp(safeTopDp)}) + 2;
+          node = document.elementFromPoint(Math.floor(window.innerWidth / 2), y);
         } catch (e) { node = null; }
         if (!node) { node = document.body || document.documentElement; }
         while (node && node.nodeType === 1) {
