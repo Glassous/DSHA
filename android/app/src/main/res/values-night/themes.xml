@@ -1,0 +1,4 @@
+<resources>
+    <!-- 深色模式下使用系统深色无 ActionBar 主题，Compose 侧自行决定具体配色。 -->
+    <style name="Theme.DSHA" parent="android:Theme.DeviceDefault.NoActionBar" />
+</resources>

@@ -1,0 +1,8 @@
+<resources>
+    <!--
+      仅作为 Activity 启动窗口主题：配色与外观全部由 Compose Material3 主题接管，
+      因此不继承 MaterialComponents，也不设置任何 Material 属性。
+      深色版本见 values-night/themes.xml。
+    -->
+    <style name="Theme.DSHA" parent="android:Theme.DeviceDefault.Light.NoActionBar" />
+</resources>
