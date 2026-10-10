@@ -65,6 +65,7 @@ fun DshaWebView(
     profile: Profile,
     startUrl: String,
     modifier: Modifier = Modifier,
+    bottomInsetPx: Int = 0,
     onWebViewCreated: (WebView) -> Unit = {},
     onProgress: (Int) -> Unit = {},
     onCanGoBackChanged: (Boolean) -> Unit = {},
@@ -79,6 +80,7 @@ fun DshaWebView(
     val onLoadErrorState = rememberUpdatedState(onLoadError)
     val onEventState = rememberUpdatedState(onEvent)
     val onCreatedState = rememberUpdatedState(onWebViewCreated)
+    val bottomInsetState = rememberUpdatedState(bottomInsetPx)
 
     val fileLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -108,6 +110,7 @@ fun DshaWebView(
                 context = context,
                 profile = profile,
                 alive = alive,
+                bottomInset = { bottomInsetState.value },
                 onCanGoBack = { value -> onCanGoBackState.value(value) },
                 onLoadError = { failed -> onLoadErrorState.value(failed) },
                 onEvent = { event -> onEventState.value(event) },
@@ -144,6 +147,12 @@ fun DshaWebView(
         webView.loadUrl(startUrl)
     }
 
+    // 导航栏/键盘高度变化时同步更新网页的底部抬起高度
+    LaunchedEffect(webView, bottomInsetPx) {
+        if (measuredSize.value == null) return@LaunchedEffect
+        applyBottomInset(webView, bottomInsetPx)
+    }
+
     DisposableEffect(webView) {
         onDispose {
             alive.value = false
@@ -168,6 +177,8 @@ private const val SHELL_COMPAT_DELAY_MS = 1_500L
 private const val DIALOG_MIN_SIDE_PX = 2
 private const val DIALOG_MAX_WIDTH_PX = 380
 private const val DIALOG_VIEWPORT_MARGIN_PX = 48
+private const val BOTTOM_INSET_STYLE_ID = "dsha-bottom-inset-style"
+private const val BOTTOM_INSET_VAR = "--dsha-safe-bottom"
 
 /**
  * 视口单位兜底：部分设备的 WebView 里，以视口为基准的百分比与 `vh` 都会解析成 **0**
@@ -275,6 +286,7 @@ private fun buildWebViewClient(
     context: Context,
     profile: Profile,
     alive: MutableState<Boolean>,
+    bottomInset: () -> Int,
     onCanGoBack: (Boolean) -> Unit,
     onLoadError: (Boolean) -> Unit,
     onEvent: (WebEvent) -> Unit,
@@ -324,6 +336,7 @@ private fun buildWebViewClient(
         onCanGoBack(view.canGoBack())
         scheduleAutoFill(view, profile, alive, attempt = 0, onFallback = { onEvent(WebEvent.AUTOFILL_FALLBACK) })
         applyShellCompat(view)
+        applyBottomInset(view, bottomInset())
     }
 
     override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
@@ -437,6 +450,43 @@ private fun applyShellCompat(webView: WebView) {
         }
     }, SHELL_COMPAT_DELAY_MS)
 }
+
+/**
+ * 把「底部抬起高度」写进页面：让网页内容整体让开系统导航栏（小白条）占据的区域。
+ *
+ * 做法是给 `html` 加 padding-bottom，并用 border-box 让它计入 100% 高度；
+ * DSH 前端的 `html`、`body`、`#root` 逐级 100% 的高度链会跟着整体上抬，
+ * 而不是被撑出多余滚动。同时暴露 CSS 变量 --dsha-safe-bottom 供页面自行取值。
+ */
+private fun applyBottomInset(webView: WebView, insetPx: Int) {
+    webView.evaluateJavascript(buildBottomInsetScript(insetPx)) { result ->
+        Log.d(TAG, "底部抬起 ${insetPx}px: ${result?.trim('"')}")
+    }
+}
+
+private fun buildBottomInsetScript(insetPx: Int): String = """
+    (function () {
+      try {
+        var root = document.documentElement;
+        if (!root) { return 'nopage'; }
+        var px = $insetPx;
+        var style = document.getElementById('$BOTTOM_INSET_STYLE_ID');
+        if (!style) {
+          style = document.createElement('style');
+          style.id = '$BOTTOM_INSET_STYLE_ID';
+          (document.head || root).appendChild(style);
+        }
+        style.textContent = px > 0
+          ? 'html{padding-bottom:' + px + 'px !important;box-sizing:border-box !important;}'
+          : '';
+        root.style.setProperty('$BOTTOM_INSET_VAR', px + 'px');
+        window.dispatchEvent(new Event('resize'));
+        return 'ok';
+      } catch (e) {
+        return 'error:' + e;
+      }
+    })();
+""".trimIndent()
 
 /** 同站点链接留在壳内，其余交给系统浏览器；返回 true 表示链接已被外部处理。 */
 private fun shouldOpenExternally(

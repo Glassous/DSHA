@@ -5,23 +5,26 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -40,12 +43,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.glassous.dsha.R
+import com.glassous.dsha.ui.clearFocusOnTap
 import com.glassous.dsha.ui.dshaViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,6 +65,8 @@ fun ProfileEditScreen(
     var confirmDelete by remember { mutableStateOf(false) }
 
     Scaffold(
+        // 点击顶部栏、表单间隙等非输入区域时收起键盘
+        modifier = Modifier.clearFocusOnTap(),
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
@@ -76,6 +83,18 @@ fun ProfileEditScreen(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.cd_back),
                         )
+                    }
+                },
+                actions = {
+                    // 删除不可逆，统一走确认弹窗（与列表页卡片菜单一致）
+                    if (viewModel.isEditing) {
+                        IconButton(onClick = { confirmDelete = true }) {
+                            Icon(
+                                imageVector = Icons.Filled.Delete,
+                                contentDescription = stringResource(R.string.action_delete),
+                                tint = MaterialTheme.colorScheme.error,
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -101,32 +120,22 @@ fun ProfileEditScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
-                .imePadding()
+                // Scaffold 的 innerPadding 已经让出了导航栏（小白条）高度，
+                // 这里只补 IME 中超出导航栏的部分，避免键盘弹出时底部多出一段空白。
+                .windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets.navigationBars))
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            BasicInfoCard(viewModel)
+            BasicInfoFields(viewModel)
 
             Button(
                 onClick = { viewModel.save(onBack) },
                 enabled = !viewModel.saving,
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(20.dp),
                 contentPadding = PaddingValues(vertical = 14.dp),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(R.string.action_save))
-            }
-
-            if (viewModel.isEditing) {
-                TextButton(
-                    onClick = { confirmDelete = true },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        text = stringResource(R.string.action_delete),
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
             }
 
             Spacer(Modifier.height(16.dp))
@@ -153,89 +162,86 @@ fun ProfileEditScreen(
 }
 
 @Composable
-private fun BasicInfoCard(viewModel: ProfileEditViewModel) {
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+private fun BasicInfoFields(viewModel: ProfileEditViewModel) {
+    Column(
         modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.section_basic_info),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        Text(
+            text = stringResource(R.string.section_basic_info),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
-            OutlinedTextField(
-                value = viewModel.baseUrl,
-                onValueChange = { viewModel.baseUrl = it },
-                label = { Text(stringResource(R.string.label_base_url)) },
-                placeholder = { Text(stringResource(R.string.hint_base_url)) },
-                singleLine = true,
-                isError = viewModel.baseUrlError != null,
-                supportingText = viewModel.baseUrlError?.let { error -> { Text(stringResource(error)) } },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth(),
-            )
+        OutlinedTextField(
+            value = viewModel.baseUrl,
+            onValueChange = { viewModel.baseUrl = it },
+            label = { Text(stringResource(R.string.label_base_url)) },
+            placeholder = { Text(stringResource(R.string.hint_base_url)) },
+            singleLine = true,
+            isError = viewModel.baseUrlError != null,
+            supportingText = viewModel.baseUrlError?.let { error -> { Text(stringResource(error)) } },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+            shape = RoundedCornerShape(20.dp),
+            modifier = Modifier.fillMaxWidth(),
+        )
 
-            OutlinedTextField(
-                value = viewModel.name,
-                onValueChange = { viewModel.name = it },
-                label = { Text(stringResource(R.string.label_profile_name)) },
-                placeholder = { Text(stringResource(R.string.hint_profile_name)) },
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth(),
-            )
+        OutlinedTextField(
+            value = viewModel.name,
+            onValueChange = { viewModel.name = it },
+            label = { Text(stringResource(R.string.label_profile_name)) },
+            placeholder = { Text(stringResource(R.string.hint_profile_name)) },
+            singleLine = true,
+            shape = RoundedCornerShape(20.dp),
+            modifier = Modifier.fillMaxWidth(),
+        )
 
-            OutlinedTextField(
-                value = viewModel.username,
-                onValueChange = { viewModel.username = it },
-                label = { Text(stringResource(R.string.label_username)) },
-                singleLine = true,
-                isError = viewModel.usernameError != null,
-                supportingText = viewModel.usernameError?.let { error -> { Text(stringResource(error)) } },
-                leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth(),
-            )
+        OutlinedTextField(
+            value = viewModel.username,
+            onValueChange = { viewModel.username = it },
+            label = { Text(stringResource(R.string.label_username)) },
+            singleLine = true,
+            isError = viewModel.usernameError != null,
+            supportingText = viewModel.usernameError?.let { error -> { Text(stringResource(error)) } },
+            leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
+            shape = RoundedCornerShape(20.dp),
+            modifier = Modifier.fillMaxWidth(),
+        )
 
-            OutlinedTextField(
-                value = viewModel.password,
-                onValueChange = { viewModel.password = it },
-                label = { Text(stringResource(R.string.label_password)) },
-                singleLine = true,
-                isError = viewModel.passwordError != null,
-                supportingText = viewModel.passwordError?.let { error -> { Text(stringResource(error)) } },
-                leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null) },
-                trailingIcon = {
-                    TextButton(
-                        onClick = { viewModel.passwordVisible = !viewModel.passwordVisible },
-                        contentPadding = PaddingValues(horizontal = 10.dp),
-                    ) {
-                        Text(
-                            text = stringResource(
-                                if (viewModel.passwordVisible) R.string.action_hide_password else R.string.action_show_password,
-                            ),
-                            style = MaterialTheme.typography.labelMedium,
-                        )
-                    }
-                },
-                visualTransformation = if (viewModel.passwordVisible) {
-                    VisualTransformation.None
-                } else {
-                    PasswordVisualTransformation()
-                },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
+        OutlinedTextField(
+            value = viewModel.password,
+            onValueChange = { viewModel.password = it },
+            label = { Text(stringResource(R.string.label_password)) },
+            singleLine = true,
+            isError = viewModel.passwordError != null,
+            supportingText = viewModel.passwordError?.let { error -> { Text(stringResource(error)) } },
+            leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null) },
+            trailingIcon = {
+                IconButton(onClick = { viewModel.passwordVisible = !viewModel.passwordVisible }) {
+                    Icon(
+                        painter = painterResource(
+                            if (viewModel.passwordVisible) {
+                                R.drawable.ic_visibility_off
+                            } else {
+                                R.drawable.ic_visibility
+                            },
+                        ),
+                        contentDescription = stringResource(
+                            if (viewModel.passwordVisible) R.string.action_hide_password else R.string.action_show_password,
+                        ),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            visualTransformation = if (viewModel.passwordVisible) {
+                VisualTransformation.None
+            } else {
+                PasswordVisualTransformation()
+            },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            shape = RoundedCornerShape(20.dp),
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 

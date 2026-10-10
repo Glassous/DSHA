@@ -2,10 +2,12 @@ package com.glassous.dsha.ui.theme
 
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -41,6 +43,10 @@ fun DshaTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = DshaTypography,
-        content = content,
-    )
+    ) {
+        // 全局关闭点击水波纹：LocalRippleConfiguration 为 null 时 ripple 不绘制
+        CompositionLocalProvider(LocalRippleConfiguration provides null) {
+            content()
+        }
+    }
 }

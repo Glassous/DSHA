@@ -6,12 +6,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
@@ -39,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -66,6 +73,13 @@ fun WebScreen(
     val profile = viewModel.profile
     val startUrl = viewModel.startUrl
 
+    // 网页要自行避让的底部高度：键盘收起时等于导航栏（小白条）高度；键盘弹出时
+    // WebView 已整体上移（imePadding），再注入导航栏高度会让输入框与键盘之间多出一段空隙。
+    val density = LocalDensity.current
+    val navBarsBottomPx = WindowInsets.navigationBars.getBottom(density)
+    val imeBottomPx = WindowInsets.ime.getBottom(density)
+    val bottomInsetPx = if (imeBottomPx > navBarsBottomPx) 0 else navBarsBottomPx
+
     LaunchedEffect(messageRes) {
         messageRes?.let { res ->
             snackbarHostState.showSnackbar(resources.getString(res))
@@ -81,6 +95,9 @@ fun WebScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        // 顶部交给 TopAppBar 自己伸入状态栏；底部不预留导航栏，让网页延伸到小白条区域，
+        // 再由注入的底部抬起高度保证内容不被遮挡。
+        contentWindowInsets = WindowInsets.systemBars.only(WindowInsetsSides.Horizontal),
         topBar = {
             Column {
                 TopAppBar(
@@ -159,6 +176,7 @@ fun WebScreen(
                         profile = currentProfile,
                         startUrl = currentStartUrl,
                         modifier = Modifier.fillMaxSize(),
+                        bottomInsetPx = bottomInsetPx,
                         onWebViewCreated = { created -> webView = created },
                         onProgress = { value -> viewModel.progress = value },
                         onCanGoBackChanged = { value -> viewModel.canGoBack = value },
