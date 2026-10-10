@@ -31,8 +31,6 @@ class WebViewModel(
 
     var progress by mutableIntStateOf(0)
 
-    var canGoBack by mutableStateOf(false)
-
     var loadError by mutableStateOf(false)
 
     init {

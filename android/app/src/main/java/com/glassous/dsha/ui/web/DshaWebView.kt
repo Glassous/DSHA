@@ -34,6 +34,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
@@ -41,6 +42,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.glassous.dsha.data.Profile
 import com.glassous.dsha.data.UrlUtils
+import kotlinx.coroutines.delay
 import org.json.JSONObject
 
 /** WebView 里发生、需要向用户提示一次的事件。 */
@@ -70,6 +72,7 @@ fun DshaWebView(
     onProgress: (Int) -> Unit = {},
     onCanGoBackChanged: (Boolean) -> Unit = {},
     onLoadError: (Boolean) -> Unit = {},
+    onBackgroundColor: (Color) -> Unit = {},
     onEvent: (WebEvent) -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -80,6 +83,7 @@ fun DshaWebView(
     val onLoadErrorState = rememberUpdatedState(onLoadError)
     val onEventState = rememberUpdatedState(onEvent)
     val onCreatedState = rememberUpdatedState(onWebViewCreated)
+    val onBackgroundColorState = rememberUpdatedState(onBackgroundColor)
     val bottomInsetState = rememberUpdatedState(bottomInsetPx)
 
     val fileLauncher = rememberLauncherForActivityResult(
@@ -113,6 +117,7 @@ fun DshaWebView(
                 bottomInset = { bottomInsetState.value },
                 onCanGoBack = { value -> onCanGoBackState.value(value) },
                 onLoadError = { failed -> onLoadErrorState.value(failed) },
+                onBackgroundColor = { color -> onBackgroundColorState.value(color) },
                 onEvent = { event -> onEventState.value(event) },
             )
             webChromeClient = buildWebChromeClient(
@@ -147,10 +152,33 @@ fun DshaWebView(
         webView.loadUrl(startUrl)
     }
 
-    // 导航栏/键盘高度变化时同步更新网页的底部抬起高度
+    // 导航栏/键盘高度变化时同步更新网页底部的安全距离
     LaunchedEffect(webView, bottomInsetPx) {
         if (measuredSize.value == null) return@LaunchedEffect
         applyBottomInset(webView, bottomInsetPx)
+    }
+
+    // 顶栏色块要实时跟随网页背景：深浅主题切换、无刷新跳转都可能改底色，
+    // 因此持续采样；颜色稳定后放慢频率，颜色变化才向上抛出（避免无谓重组）。
+    LaunchedEffect(webView) {
+        var last: Color? = null
+        var stableRounds = 0
+        while (true) {
+            delay(
+                if (stableRounds >= STABLE_BACKGROUND_ROUNDS) BACKGROUND_IDLE_SAMPLE_INTERVAL_MS
+                else BACKGROUND_SAMPLE_INTERVAL_MS,
+            )
+            if (measuredSize.value == null) continue
+            sampleBackgroundColor(webView) { color ->
+                if (color == last) {
+                    stableRounds++
+                } else {
+                    last = color
+                    stableRounds = 0
+                    onBackgroundColorState.value(color)
+                }
+            }
+        }
     }
 
     DisposableEffect(webView) {
@@ -179,6 +207,11 @@ private const val DIALOG_MAX_WIDTH_PX = 380
 private const val DIALOG_VIEWPORT_MARGIN_PX = 48
 private const val BOTTOM_INSET_STYLE_ID = "dsha-bottom-inset-style"
 private const val BOTTOM_INSET_VAR = "--dsha-safe-bottom"
+
+/** 顶栏色块采样网页背景色的节奏：颜色未稳定时密集采样，稳定后降频。 */
+private const val BACKGROUND_SAMPLE_INTERVAL_MS = 500L
+private const val BACKGROUND_IDLE_SAMPLE_INTERVAL_MS = 2_000L
+private const val STABLE_BACKGROUND_ROUNDS = 4
 
 /**
  * 视口单位兜底：部分设备的 WebView 里，以视口为基准的百分比与 `vh` 都会解析成 **0**
@@ -289,6 +322,7 @@ private fun buildWebViewClient(
     bottomInset: () -> Int,
     onCanGoBack: (Boolean) -> Unit,
     onLoadError: (Boolean) -> Unit,
+    onBackgroundColor: (Color) -> Unit,
     onEvent: (WebEvent) -> Unit,
 ): WebViewClient = object : WebViewClient() {
 
@@ -337,6 +371,8 @@ private fun buildWebViewClient(
         scheduleAutoFill(view, profile, alive, attempt = 0, onFallback = { onEvent(WebEvent.AUTOFILL_FALLBACK) })
         applyShellCompat(view)
         applyBottomInset(view, bottomInset())
+        // 每次整页加载完成后重新采样：顶栏色块要与网页背景保持一致
+        sampleBackgroundColor(view, onBackgroundColor)
     }
 
     override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
@@ -452,34 +488,35 @@ private fun applyShellCompat(webView: WebView) {
 }
 
 /**
- * 把「底部抬起高度」写进页面：让网页内容整体让开系统导航栏（小白条）占据的区域。
+ * 把底部安全距离写进页面：内容让开系统导航栏（小白条）占据的区域。
  *
  * 做法是给 `html` 加 padding-bottom，并用 border-box 让它计入 100% 高度；
- * DSH 前端的 `html`、`body`、`#root` 逐级 100% 的高度链会跟着整体上抬，
- * 而不是被撑出多余滚动。同时暴露 CSS 变量 --dsha-safe-bottom 供页面自行取值。
+ * DSH 前端的 `html`、`body`、`#root` 逐级 100% 的高度链会跟着整体内缩，
+ * 而不是被撑出多余滚动。同时暴露 --dsha-safe-bottom 供页面自行取值。
+ * 顶部不做注入：状态栏区域由应用侧用与网页背景同色的色块填充，网页本身不伸入顶栏。
  */
-private fun applyBottomInset(webView: WebView, insetPx: Int) {
-    webView.evaluateJavascript(buildBottomInsetScript(insetPx)) { result ->
-        Log.d(TAG, "底部抬起 ${insetPx}px: ${result?.trim('"')}")
+private fun applyBottomInset(webView: WebView, bottomInsetPx: Int) {
+    webView.evaluateJavascript(buildBottomInsetScript(bottomInsetPx)) { result ->
+        Log.d(TAG, "底部安全距离 ${bottomInsetPx}px: ${result?.trim('"')}")
     }
 }
 
-private fun buildBottomInsetScript(insetPx: Int): String = """
+private fun buildBottomInsetScript(bottomInsetPx: Int): String = """
     (function () {
       try {
         var root = document.documentElement;
         if (!root) { return 'nopage'; }
-        var px = $insetPx;
+        var bottom = $bottomInsetPx;
         var style = document.getElementById('$BOTTOM_INSET_STYLE_ID');
         if (!style) {
           style = document.createElement('style');
           style.id = '$BOTTOM_INSET_STYLE_ID';
           (document.head || root).appendChild(style);
         }
-        style.textContent = px > 0
-          ? 'html{padding-bottom:' + px + 'px !important;box-sizing:border-box !important;}'
+        style.textContent = bottom > 0
+          ? 'html{padding-bottom:' + bottom + 'px !important;box-sizing:border-box !important;}'
           : '';
-        root.style.setProperty('$BOTTOM_INSET_VAR', px + 'px');
+        root.style.setProperty('$BOTTOM_INSET_VAR', bottom + 'px');
         window.dispatchEvent(new Event('resize'));
         return 'ok';
       } catch (e) {
@@ -487,6 +524,59 @@ private fun buildBottomInsetScript(insetPx: Int): String = """
       }
     })();
 """.trimIndent()
+
+/**
+ * 采样网页自身的背景色，供应用侧绘制状态栏区域的色块（避免网页伸入顶栏）。
+ *
+ * 取页面顶边中间位置的元素，沿祖先链找第一个不透明背景，与浏览器实际的叠色顺序一致；
+ * 整条链都透明时按 WebView 默认白底处理。半透明色按白色底合成，
+ * 页面用深色主题、而后端仍是白底等情况都能拿到真实颜色。
+ */
+private fun sampleBackgroundColor(webView: WebView, onResult: (Color) -> Unit) {
+    webView.evaluateJavascript(BACKGROUND_COLOR_JS) { raw ->
+        val parts = raw?.trim('"').orEmpty().split(',')
+        if (parts.size != 3) return@evaluateJavascript
+        val rgb = parts.mapNotNull { it.trim().toIntOrNull() }
+        if (rgb.size != 3) return@evaluateJavascript
+        onResult(Color(rgb[0], rgb[1], rgb[2]))
+    }
+}
+
+private const val BACKGROUND_COLOR_JS = """
+    (function () {
+      try {
+        function parse(color) {
+          if (!color || color === 'transparent') { return null; }
+          var m = color.match(/rgba?\(([^)]+)\)/);
+          if (!m) { return null; }
+          var parts = m[1].split(',');
+          var a = parts.length > 3 ? parseFloat(parts[3]) : 1;
+          if (!(a > 0)) { return null; }
+          var mix = function (v) {
+            var n = parseInt(v, 10);
+            if (isNaN(n)) { return null; }
+            return Math.round(n * a + 255 * (1 - a));
+          };
+          var r = mix(parts[0]), g = mix(parts[1]), b = mix(parts[2]);
+          if (r === null || g === null || b === null) { return null; }
+          return r + ',' + g + ',' + b;
+        }
+        var node = null;
+        try {
+          node = document.elementFromPoint(Math.floor(window.innerWidth / 2), 3);
+        } catch (e) { node = null; }
+        if (!node) { node = document.body || document.documentElement; }
+        while (node && node.nodeType === 1) {
+          var current = parse(getComputedStyle(node).backgroundColor);
+          if (current) { return current; }
+          node = node.parentElement;
+        }
+        return '255,255,255';
+      } catch (e) {
+        return '';
+      }
+    })();
+"""
 
 /** 同站点链接留在壳内，其余交给系统浏览器；返回 true 表示链接已被外部处理。 */
 private fun shouldOpenExternally(

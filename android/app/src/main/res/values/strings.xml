@@ -11,6 +11,7 @@
     <string name="action_save">保存</string>
     <string name="action_cancel">取消</string>
     <string name="action_back">返回</string>
+    <string name="action_close">关闭</string>
     <string name="action_retry">重试</string>
     <string name="action_show_password">显示</string>
     <string name="action_hide_password">隐藏</string>
@@ -42,6 +43,7 @@
     <string name="web_download_started">已开始下载</string>
     <string name="web_download_failed">下载失败</string>
     <string name="web_profile_missing">连接组不存在，请返回重新选择</string>
+    <string name="web_close_confirm_message">关闭后返回连接组列表，可随时重新连接。</string>
 
     <!-- 无障碍 -->
     <string name="cd_new_profile">新建连接组</string>
