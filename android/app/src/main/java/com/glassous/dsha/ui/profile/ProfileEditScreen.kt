@@ -18,11 +18,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -80,7 +75,7 @@ fun ProfileEditScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            painter = painterResource(R.drawable.ic_arrow_back),
                             contentDescription = stringResource(R.string.cd_back),
                         )
                     }
@@ -90,7 +85,7 @@ fun ProfileEditScreen(
                     if (viewModel.isEditing) {
                         IconButton(onClick = { confirmDelete = true }) {
                             Icon(
-                                imageVector = Icons.Filled.Delete,
+                                painter = painterResource(R.drawable.ic_delete),
                                 contentDescription = stringResource(R.string.action_delete),
                                 tint = MaterialTheme.colorScheme.error,
                             )
@@ -223,7 +218,7 @@ private fun CredentialsFields(viewModel: ProfileEditViewModel) {
             singleLine = true,
             isError = viewModel.usernameError != null,
             supportingText = viewModel.usernameError?.let { error -> { Text(stringResource(error)) } },
-            leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
+            leadingIcon = { Icon(painterResource(R.drawable.ic_person), contentDescription = null) },
             shape = RoundedCornerShape(20.dp),
             modifier = Modifier.fillMaxWidth(),
         )
@@ -235,7 +230,7 @@ private fun CredentialsFields(viewModel: ProfileEditViewModel) {
             singleLine = true,
             isError = viewModel.passwordError != null,
             supportingText = viewModel.passwordError?.let { error -> { Text(stringResource(error)) } },
-            leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null) },
+            leadingIcon = { Icon(painterResource(R.drawable.ic_lock), contentDescription = null) },
             trailingIcon = {
                 IconButton(onClick = { viewModel.passwordVisible = !viewModel.passwordVisible }) {
                     Icon(

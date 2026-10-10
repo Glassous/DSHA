@@ -27,9 +27,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -57,6 +54,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -318,7 +316,7 @@ private fun CloseConfirmDialog(
                 )
                 IconButton(onClick = onRefresh, enabled = canRefresh) {
                     Icon(
-                        imageVector = Icons.Filled.Refresh,
+                        painter = painterResource(R.drawable.ic_refresh),
                         contentDescription = stringResource(R.string.cd_refresh),
                     )
                 }
@@ -346,7 +344,7 @@ private fun MissingProfileContent(onBack: () -> Unit, modifier: Modifier = Modif
         verticalArrangement = Arrangement.Center,
     ) {
         Icon(
-            imageVector = Icons.Filled.Warning,
+            painter = painterResource(R.drawable.ic_warning),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(40.dp),
@@ -378,7 +376,7 @@ private fun LoadErrorContent(
         verticalArrangement = Arrangement.Center,
     ) {
         Icon(
-            imageVector = Icons.Filled.Warning,
+            painter = painterResource(R.drawable.ic_warning),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.error,
             modifier = Modifier.size(40.dp),

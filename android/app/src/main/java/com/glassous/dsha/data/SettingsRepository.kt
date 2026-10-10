@@ -1,13 +1,12 @@
 package com.glassous.dsha.data
 
 import android.content.Context
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.preferencesDataStore
+import android.content.SharedPreferences
+import android.util.Log
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.withContext
 
 /**
  * 应用级设置。
@@ -25,34 +24,46 @@ data class AppSettings(
     val onboardingCompleted: Boolean = false,
 )
 
-private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "dsha_settings")
+/**
+ * 应用级设置的持久化：字段少，逐项存进 SharedPreferences（平台 API，不引入 datastore）；
+ * 对外接口（Flow + suspend 函数）与之前的实现保持一致。
+ */
+class SettingsRepository(context: Context) {
 
-/** 应用级设置的持久化：字段少，逐项存进 DataStore 即可。 */
-class SettingsRepository(private val context: Context) {
+    private val prefs: SharedPreferences =
+        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    val settings: Flow<AppSettings> = context.settingsDataStore.data.map { prefs ->
-        AppSettings(
-            credentialsEnabled = prefs[KEY_CREDENTIALS] ?: false,
-            adaptiveCompatEnabled = prefs[KEY_ADAPTIVE_COMPAT] ?: true,
-            onboardingCompleted = prefs[KEY_ONBOARDING] ?: false,
-        )
-    }
+    private val state = MutableStateFlow(read())
 
-    suspend fun setCredentialsEnabled(enabled: Boolean) {
-        context.settingsDataStore.edit { prefs -> prefs[KEY_CREDENTIALS] = enabled }
-    }
+    val settings: Flow<AppSettings> = state
 
-    suspend fun setAdaptiveCompatEnabled(enabled: Boolean) {
-        context.settingsDataStore.edit { prefs -> prefs[KEY_ADAPTIVE_COMPAT] = enabled }
-    }
+    suspend fun setCredentialsEnabled(enabled: Boolean) = write(KEY_CREDENTIALS, enabled)
 
-    suspend fun setOnboardingCompleted(completed: Boolean) {
-        context.settingsDataStore.edit { prefs -> prefs[KEY_ONBOARDING] = completed }
+    suspend fun setAdaptiveCompatEnabled(enabled: Boolean) = write(KEY_ADAPTIVE_COMPAT, enabled)
+
+    suspend fun setOnboardingCompleted(completed: Boolean) = write(KEY_ONBOARDING, completed)
+
+    private fun read(): AppSettings = AppSettings(
+        credentialsEnabled = prefs.getBoolean(KEY_CREDENTIALS, false),
+        adaptiveCompatEnabled = prefs.getBoolean(KEY_ADAPTIVE_COMPAT, true),
+        onboardingCompleted = prefs.getBoolean(KEY_ONBOARDING, false),
+    )
+
+    private suspend fun write(key: String, value: Boolean) {
+        // commit 而非 apply：先落盘成功再更新内存，避免界面显示一个没存下去的开关状态
+        val saved = withContext(Dispatchers.IO) { prefs.edit().putBoolean(key, value).commit() }
+        if (saved) {
+            state.value = read()
+        } else {
+            Log.w(TAG, "设置写入失败：$key")
+        }
     }
 
     private companion object {
-        val KEY_CREDENTIALS = booleanPreferencesKey("credentials_enabled")
-        val KEY_ADAPTIVE_COMPAT = booleanPreferencesKey("adaptive_compat_enabled")
-        val KEY_ONBOARDING = booleanPreferencesKey("onboarding_completed")
+        const val TAG = "SettingsRepository"
+        const val PREFS_NAME = "dsha_settings"
+        const val KEY_CREDENTIALS = "credentials_enabled"
+        const val KEY_ADAPTIVE_COMPAT = "adaptive_compat_enabled"
+        const val KEY_ONBOARDING = "onboarding_completed"
     }
 }

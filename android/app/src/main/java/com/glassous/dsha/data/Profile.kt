@@ -1,14 +1,13 @@
 package com.glassous.dsha.data
 
-import kotlinx.serialization.Serializable
 import java.util.UUID
 
 /**
  * 一个"连接组"：服务地址 + 账号 + 密码。
  *
  * 密码按需求明文保存在本机（自用内网场景），不做加密。
+ * 持久化由 [ProfileRepository] 手写 JSON 完成，不再依赖序列化库。
  */
-@Serializable
 data class Profile(
     val id: String = newId(),
     val name: String = "",

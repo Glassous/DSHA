@@ -1,8 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
-    // AGP 9 内置 Kotlin：无需 kotlin-android；Compose 编译器与序列化仍是独立的 Kotlin 编译器插件
+    // AGP 9 内置 Kotlin：无需 kotlin-android；只剩 Compose 一个独立的 Kotlin 编译器插件
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -42,32 +41,17 @@ android {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.appcompat)
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.graphics)
-    implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.foundation)
     implementation(libs.compose.material3)
-    implementation(libs.compose.material.icons.core)
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
 
-    implementation(libs.androidx.datastore.preferences)
-    implementation(libs.androidx.webkit)
-    implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
-
-    testImplementation(libs.junit)
-
-    androidTestImplementation(platform(libs.compose.bom))
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-
-    debugImplementation(libs.compose.ui.tooling)
-    debugImplementation(libs.compose.ui.test.manifest)
 }

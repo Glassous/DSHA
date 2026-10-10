@@ -18,13 +18,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -102,7 +95,7 @@ fun ProfileListScreen(
                 actions = {
                     IconButton(onClick = onSettings) {
                         Icon(
-                            imageVector = Icons.Filled.Settings,
+                            painter = painterResource(R.drawable.ic_settings),
                             contentDescription = stringResource(R.string.cd_settings),
                         )
                     }
@@ -127,7 +120,7 @@ fun ProfileListScreen(
                     modifier = newProfileContainer,
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.Add,
+                        painter = painterResource(R.drawable.ic_add),
                         contentDescription = stringResource(R.string.cd_new_profile),
                     )
                 }
@@ -170,7 +163,7 @@ fun ProfileListScreen(
     pendingDelete?.let { target ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            icon = { Icon(Icons.Filled.Delete, contentDescription = null) },
+            icon = { Icon(painterResource(R.drawable.ic_delete), contentDescription = null) },
             title = { Text(stringResource(R.string.dialog_delete_title)) },
             text = { Text(stringResource(R.string.dialog_delete_message, target.displayName)) },
             confirmButton = {
@@ -229,7 +222,7 @@ private fun ProfileCard(
                 }
             }
             Icon(
-                imageVector = Icons.Filled.PlayArrow,
+                painter = painterResource(R.drawable.ic_play_arrow),
                 contentDescription = stringResource(R.string.cd_connect),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(horizontal = 4.dp),
@@ -237,7 +230,7 @@ private fun ProfileCard(
             Box {
                 IconButton(onClick = { menuExpanded = true }) {
                     Icon(
-                        imageVector = Icons.Filled.MoreVert,
+                        painter = painterResource(R.drawable.ic_more_vert),
                         contentDescription = stringResource(R.string.cd_more_actions),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -302,7 +295,7 @@ private fun EmptyState(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = Icons.Filled.Add,
+                    painter = painterResource(R.drawable.ic_add),
                     contentDescription = null,
                     tint = Color.White,
                 )
@@ -343,7 +336,7 @@ private fun CardActionMenu(
     ) {
         DropdownMenuItem(
             text = { Text(stringResource(R.string.action_edit)) },
-            leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+            leadingIcon = { Icon(painterResource(R.drawable.ic_edit), contentDescription = null) },
             onClick = {
                 onDismiss()
                 onEdit()
@@ -351,7 +344,7 @@ private fun CardActionMenu(
         )
         DropdownMenuItem(
             text = { Text(stringResource(R.string.action_delete)) },
-            leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
+            leadingIcon = { Icon(painterResource(R.drawable.ic_delete), contentDescription = null) },
             onClick = {
                 onDismiss()
                 onDelete()

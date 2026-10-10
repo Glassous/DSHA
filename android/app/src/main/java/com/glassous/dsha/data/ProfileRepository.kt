@@ -1,35 +1,34 @@
 package com.glassous.dsha.data
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.util.Log
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import kotlinx.serialization.json.Json
-
-private val Context.profileDataStore: DataStore<Preferences> by preferencesDataStore(name = "dsha_profiles")
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
- * 连接组的持久化：整份列表序列化成 JSON 存进 DataStore 的单个 key。
+ * 连接组的持久化：整份列表手写成 JSON 存进 SharedPreferences 的单个 key。
  * 组数量是个位数，整表读写最简单，也天然避免了多实例并发问题。
+ *
+ * 存储全部走平台自带 API（SharedPreferences + org.json），不引入 datastore 与序列化库；
+ * 对外接口（Flow + suspend 函数）与之前的实现保持一致。
  */
-class ProfileRepository(private val context: Context) {
+class ProfileRepository(context: Context) {
 
-    private val json = Json {
-        ignoreUnknownKeys = true
-        encodeDefaults = true
-    }
+    private val prefs: SharedPreferences =
+        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    /** 内存中的当前列表，仅在落盘成功后才更新。 */
+    private val state = MutableStateFlow(read())
 
     /** 全部连接组，按最近使用时间倒序。 */
-    val profiles: Flow<List<Profile>> = context.profileDataStore.data
-        .map { prefs -> decode(prefs[KEY_PROFILES]) }
+    val profiles: Flow<List<Profile>> = state
 
-    suspend fun find(id: String): Profile? = profiles.first().firstOrNull { it.id == id }
+    suspend fun find(id: String): Profile? = state.value.firstOrNull { it.id == id }
 
     /** 新增或覆盖同 id 的组。 */
     suspend fun upsert(profile: Profile) {
@@ -51,15 +50,51 @@ class ProfileRepository(private val context: Context) {
     }
 
     private suspend fun update(transform: (List<Profile>) -> List<Profile>) {
-        context.profileDataStore.edit { prefs ->
-            val next = transform(decode(prefs[KEY_PROFILES]))
-            prefs[KEY_PROFILES] = json.encodeToString(next.sortedByDescending { it.lastUsedAt })
+        val next = transform(state.value).sortedByDescending { it.lastUsedAt }
+        val raw = encode(next)
+        // commit 而非 apply：先落盘成功再更新内存，避免界面显示一条没存下去的组
+        val saved = withContext(Dispatchers.IO) { prefs.edit().putString(KEY_PROFILES, raw).commit() }
+        if (saved) {
+            state.value = next
+        } else {
+            Log.w(TAG, "连接组写入失败，本次修改未生效")
         }
+    }
+
+    private fun read(): List<Profile> = decode(prefs.getString(KEY_PROFILES, null))
+
+    private fun encode(profiles: List<Profile>): String {
+        val array = JSONArray()
+        profiles.forEach { profile ->
+            array.put(
+                JSONObject()
+                    .put("id", profile.id)
+                    .put("name", profile.name)
+                    .put("baseUrl", profile.baseUrl)
+                    .put("username", profile.username)
+                    .put("password", profile.password)
+                    .put("lastUsedAt", profile.lastUsedAt),
+            )
+        }
+        return array.toString()
     }
 
     private fun decode(raw: String?): List<Profile> {
         if (raw.isNullOrBlank()) return emptyList()
-        return runCatching { json.decodeFromString<List<Profile>>(raw) }
+        return runCatching {
+            val array = JSONArray(raw)
+            List(array.length()) { index ->
+                val item = array.getJSONObject(index)
+                Profile(
+                    id = item.optString("id").ifBlank { Profile.newId() },
+                    name = item.optString("name"),
+                    baseUrl = item.optString("baseUrl"),
+                    username = item.optString("username"),
+                    password = item.optString("password"),
+                    lastUsedAt = item.optLong("lastUsedAt"),
+                )
+            }
+        }
             .onFailure { Log.w(TAG, "连接组数据解析失败，已按空列表处理", it) }
             .getOrDefault(emptyList())
             .sortedByDescending { it.lastUsedAt }
@@ -67,6 +102,7 @@ class ProfileRepository(private val context: Context) {
 
     private companion object {
         const val TAG = "ProfileRepository"
-        val KEY_PROFILES = stringPreferencesKey("profiles_json")
+        const val PREFS_NAME = "dsha_profiles"
+        const val KEY_PROFILES = "profiles_json"
     }
 }
