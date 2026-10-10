@@ -2,29 +2,28 @@ package com.glassous.dsha.ui.profile
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -55,6 +54,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
@@ -78,6 +78,8 @@ fun ProfileListScreen(
     val viewModel: ProfilesViewModel = viewModel()
     val profiles by viewModel.profiles.collectAsStateWithLifecycle()
     var pendingDelete by remember { mutableStateOf<Profile?>(null) }
+    // 列表已按最近使用时间倒序（上次启动的置顶），首个有过启动记录的组即"上次启动"
+    val lastLaunchedId = profiles.firstOrNull { it.lastUsedAt > 0L }?.id
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -86,19 +88,9 @@ fun ProfileListScreen(
             TopAppBar(
                 title = {
                     // TopAppBar 的标题默认从 16dp 起，补 4dp 才能与下方卡片的 20dp 左边缘对齐
-                    Row(
+                    BrandLogo(
                         modifier = Modifier.padding(start = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        BrandLogo()
-                        Spacer(Modifier.width(12.dp))
-                        Text(
-                            text = stringResource(R.string.app_title),
-                            style = MaterialTheme.typography.titleLarge,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
@@ -148,6 +140,7 @@ fun ProfileListScreen(
                 items(items = profiles, key = { it.id }) { profile ->
                     ProfileCard(
                         profile = profile,
+                        isLastLaunched = profile.id == lastLaunchedId,
                         onConnect = { onConnect(profile.id) },
                         onEdit = { onEdit(profile.id) },
                         onDelete = { pendingDelete = profile },
@@ -185,6 +178,7 @@ fun ProfileListScreen(
 @Composable
 private fun ProfileCard(
     profile: Profile,
+    isLastLaunched: Boolean,
     onConnect: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -204,16 +198,21 @@ private fun ProfileCard(
                 .padding(start = 16.dp, top = 14.dp, end = 8.dp, bottom = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = profile.displayName,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = profile.displayName,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (isLastLaunched) {
+                    Spacer(Modifier.height(6.dp))
+                    LastLaunchedBadge()
+                }
+            }
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                imageVector = Icons.Filled.PlayArrow,
                 contentDescription = stringResource(R.string.cd_connect),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(horizontal = 4.dp),
@@ -235,6 +234,20 @@ private fun ProfileCard(
             }
         }
     }
+}
+
+/** 名称正下方的"上次启动"标签：与名称文字左对齐的浅色胶囊。 */
+@Composable
+private fun LastLaunchedBadge() {
+    Text(
+        text = stringResource(R.string.profile_last_launched),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onPrimaryContainer,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    )
 }
 
 @Composable
@@ -326,20 +339,65 @@ private fun CardActionMenu(
     }
 }
 
-/** 与 [R.drawable.ic_brand_logo] 的视口宽高比保持一致（234 x 171）。 */
-private const val BRAND_LOGO_ASPECT_RATIO = 234f / 171f
+/** 品牌标识 [R.drawable.dsh] 的视口宽高比（187 x 24）。 */
+private const val BRAND_LOGO_ASPECT_RATIO = 187f / 24f
 
-/** 顶栏品牌图标：无底色，直接用主题强调色绘制海豚图案，高度与标题文字相同。 */
+/** [R.drawable.dsh] 中图形主体的填充色（近白，原图按深色底设计）。 */
+private val BrandMarkMainColor = Color(0xFFF9FAFB)
+
+/** [R.drawable.dsh] 中 HARNESS 徽章文字的填充色（深灰）。 */
+private val BrandMarkAccentColor = Color(0xFF353638)
+
+/**
+ * 顶栏品牌标识：整幅 [R.drawable.dsh]（海豚 + 文字 + 徽章）作为一体显示，高度与标题行高一致。
+ * 原图按深色底配色，深色主题直接原样显示；浅色主题做两点线性重新着色——主体映射为顶栏
+ * 内容色，HARNESS 文字映射为白色，避免文字与其底衬同被压深后糊成一整块纯黑长方形。
+ */
 @Composable
-private fun BrandLogo() {
+private fun BrandLogo(modifier: Modifier = Modifier) {
     val titleStyle = MaterialTheme.typography.titleLarge
-    val logoHeight = with(LocalDensity.current) { titleStyle.fontSize.toDp() }
+    val logoHeight = with(LocalDensity.current) { titleStyle.lineHeight.toDp() }
     Image(
-        painter = painterResource(R.drawable.ic_brand_logo),
-        contentDescription = null,
-        colorFilter = ColorFilter.tint(LocalContentColor.current),
-        modifier = Modifier
-            .height(logoHeight)
-            .aspectRatio(BRAND_LOGO_ASPECT_RATIO),
+        painter = painterResource(R.drawable.dsh),
+        contentDescription = stringResource(R.string.app_title),
+        colorFilter = if (isSystemInDarkTheme()) {
+            null
+        } else {
+            ColorFilter.colorMatrix(
+                remapColorMatrix(main = LocalContentColor.current, accent = Color.White),
+            )
+        },
+        modifier = modifier.size(
+            width = logoHeight * BRAND_LOGO_ASPECT_RATIO,
+            height = logoHeight,
+        ),
+    )
+}
+
+/**
+ * 生成逐通道线性映射矩阵：把 [BrandMarkMainColor] / [BrandMarkAccentColor] 分别映射到
+ * [main] / [accent]。图形只有这两种填充色，两点的线性映射即可精确还原、不引入色偏。
+ * 偏移列按 ColorMatrix 约定以 0…255 为单位，故乘回 255。
+ */
+private fun remapColorMatrix(main: Color, accent: Color): ColorMatrix {
+    fun axis(fromMain: Float, toMain: Float, fromAccent: Float, toAccent: Float): Pair<Float, Float> {
+        val scale = (toMain - toAccent) / (fromMain - fromAccent)
+        return scale to (toMain - scale * fromMain)
+    }
+
+    val (rScale, rOffset) =
+        axis(BrandMarkMainColor.red, main.red, BrandMarkAccentColor.red, accent.red)
+    val (gScale, gOffset) =
+        axis(BrandMarkMainColor.green, main.green, BrandMarkAccentColor.green, accent.green)
+    val (bScale, bOffset) =
+        axis(BrandMarkMainColor.blue, main.blue, BrandMarkAccentColor.blue, accent.blue)
+
+    return ColorMatrix(
+        floatArrayOf(
+            rScale, 0f, 0f, 0f, rOffset * 255f,
+            0f, gScale, 0f, 0f, gOffset * 255f,
+            0f, 0f, bScale, 0f, bOffset * 255f,
+            0f, 0f, 0f, 1f, 0f,
+        ),
     )
 }
