@@ -33,6 +33,23 @@ class WebViewModel(
 
     var loadError by mutableStateOf(false)
 
+    /** 网页首次加载完成（进度到 100）：启动动画进入"即将准备就绪"提示阶段。 */
+    var loadFinished by mutableStateOf(false)
+
+    /** 提示阶段结束：撤掉启动动画露出网页，之后页面内导航不再遮挡。 */
+    var pageReady by mutableStateOf(false)
+
+    /**
+     * 重新加载前重置状态：让启动动画完整重走一遍。
+     * progress 归零是必需的——即使旧值已是 100，也要让监听进度的 effect 重新触发。
+     */
+    fun restartLoading() {
+        progress = 0
+        loadError = false
+        loadFinished = false
+        pageReady = false
+    }
+
     init {
         viewModelScope.launch {
             val found = repository.find(profileId)

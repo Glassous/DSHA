@@ -3,16 +3,20 @@ package com.glassous.dsha.ui.web
 import android.app.Activity
 import android.webkit.WebView
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
@@ -28,10 +32,10 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -59,6 +63,13 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.glassous.dsha.R
 import com.glassous.dsha.ui.dshaViewModel
+import kotlinx.coroutines.delay
+
+/** 加载完成后的提示停留时长：这段时间内文案为"即将准备就绪"。 */
+private const val READY_HINT_DURATION_MS = 1_500L
+
+/** 启动动画层撤除时的原地淡出时长。 */
+private const val LOADING_FADE_MS = 200
 
 @Composable
 fun WebScreen(
@@ -117,6 +128,19 @@ fun WebScreen(
         }
     }
 
+    // 首次加载到 100% 后不立即露出网页：先停留两秒（文案切到"即将准备就绪"）
+    LaunchedEffect(viewModel.progress) {
+        if (viewModel.progress >= 100) viewModel.loadFinished = true
+    }
+    // 停留结束后再撤掉启动动画；之后的页面内导航不再遮挡网页。
+    // key 用 loadFinished（置位后不再变化），延迟不会因进度回调重启而中断
+    LaunchedEffect(viewModel.loadFinished) {
+        if (viewModel.loadFinished) {
+            delay(READY_HINT_DURATION_MS)
+            viewModel.pageReady = true
+        }
+    }
+
     // 返回键：优先回退网页历史；已到起点时先弹确认弹窗，确认后才关闭本页
     BackHandler {
         val current = webView
@@ -143,14 +167,13 @@ fun WebScreen(
         val currentProfile = profile
         val currentStartUrl = startUrl
         when {
-            viewModel.loading -> Box(
+            // 阶段一：本地读取连接组，尚未创建 WebView
+            viewModel.loading -> StartupLoading(
+                text = stringResource(R.string.web_starting),
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator()
-            }
+            )
 
             currentProfile == null || currentStartUrl == null -> MissingProfileContent(
                 onBack = onBack,
@@ -189,17 +212,23 @@ fun WebScreen(
                         },
                     )
 
-                    // 加载进度条贴在状态栏下方，不占用页面高度
-                    if (viewModel.progress in 1..99) {
-                        LinearProgressIndicator(
-                            progress = { viewModel.progress / 100f },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .windowInsetsPadding(WindowInsets.statusBars)
-                                .height(2.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                            trackColor = Color.Transparent,
-                            drawStopIndicator = {},
+                    // 阶段二：网页加载资源期间同样不露出 web，用启动动画整体盖住；
+                    // 加载完成后再多停留 1.5 秒（"即将准备就绪"），随后原地快速淡出
+                    AnimatedVisibility(
+                        visible = !viewModel.pageReady && !viewModel.loadError,
+                        // 进入无动画，撤除时只做 alpha 淡出：不位移、不缩放，网页从下方渐显
+                        enter = EnterTransition.None,
+                        exit = fadeOut(animationSpec = tween(LOADING_FADE_MS)),
+                    ) {
+                        StartupLoading(
+                            text = stringResource(
+                                if (viewModel.loadFinished) {
+                                    R.string.web_ready_soon
+                                } else {
+                                    R.string.web_starting_harness
+                                },
+                            ),
+                            modifier = Modifier.fillMaxSize(),
                         )
                     }
 
@@ -208,7 +237,8 @@ fun WebScreen(
                             authFailed = authFailed,
                             onRetry = {
                                 authFailed = false
-                                viewModel.loadError = false
+                                // 重试同样完整重走启动动画
+                                viewModel.restartLoading()
                                 webView?.reload()
                             },
                             modifier = Modifier.fillMaxSize(),
@@ -227,7 +257,8 @@ fun WebScreen(
             onRefresh = {
                 closeConfirmVisible = false
                 authFailed = false
-                viewModel.loadError = false
+                // 刷新同样完整重走启动动画
+                viewModel.restartLoading()
                 webView?.reload()
             },
             onConfirm = {
@@ -235,6 +266,30 @@ fun WebScreen(
                 onBack()
             },
             onDismiss = { closeConfirmVisible = false },
+        )
+    }
+}
+
+/** 启动动画：MD3 Expressive 的形状过渡指示器（实验 API），下方一行说明文字。 */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun StartupLoading(text: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        // 指示器默认容器 48dp，放大到 80dp（图形随容器等比缩放）
+        LoadingIndicator(
+            modifier = Modifier.size(80.dp),
+        )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
