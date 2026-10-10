@@ -34,6 +34,23 @@
     <string name="dialog_delete_title">删除连接组</string>
     <string name="dialog_delete_message">确定删除「%1$s」？该组的地址与凭据将从本机移除。</string>
 
+    <!-- 设置 -->
+    <string name="title_settings">设置</string>
+    <string name="cd_settings">设置</string>
+    <string name="setting_credentials_title">使用账号密码</string>
+    <string name="setting_credentials_desc">DeepSeek Harness 本身没有登录模块；仅当服务由 1Panel 等反向代理加了 Basic 鉴权时才需要开启。关闭后直接进入，已填写的凭据会被忽略。</string>
+    <string name="setting_adaptive_title">响应式兼容</string>
+    <string name="setting_adaptive_desc">注入针对 DeepSeek Harness 0.2.0-rc.2 的手机端响应式适配。Harness 更新后如出现显示异常，可关闭此项，仅保留基本页面显示。</string>
+    <string name="setting_credentials_disabled_hint">账号密码已在设置中关闭，连接时不会使用</string>
+
+    <!-- 快捷设置（首次启动，两页） -->
+    <string name="onboarding_title">先进行几个设置吧</string>
+    <string name="onboarding_credentials_desc">DeepSeek Harness 本身没有登录模块，账号密码只在服务套了 1Panel 等反向代理鉴权时才需要。关闭后直接进入，已填写的凭据会被忽略。</string>
+    <string name="onboarding_adaptive_desc">应用会为 DeepSeek Harness 0.2.0-rc.2 注入手机端响应式适配，获得更好的显示效果；Harness 更新后若出现显示异常，可随时关闭。</string>
+    <string name="onboarding_next">下一步</string>
+    <string name="onboarding_prev">上一步</string>
+    <string name="onboarding_confirm">完成</string>
+
     <!-- 网页壳 -->
     <string name="web_starting">启动中</string>
     <string name="web_starting_harness">正在启动Harness</string>

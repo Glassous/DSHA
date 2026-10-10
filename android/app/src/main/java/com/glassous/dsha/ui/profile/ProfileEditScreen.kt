@@ -196,6 +196,26 @@ private fun BasicInfoFields(viewModel: ProfileEditViewModel) {
             modifier = Modifier.fillMaxWidth(),
         )
 
+        // 账号密码由应用设置统一控制：关闭时不显示字段，保存也不校验
+        if (viewModel.credentialsEnabled) {
+            CredentialsFields(viewModel)
+        } else {
+            Text(
+                text = stringResource(R.string.setting_credentials_disabled_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** 账号密码字段：仅在应用设置开启凭据时显示。 */
+@Composable
+private fun CredentialsFields(viewModel: ProfileEditViewModel) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         OutlinedTextField(
             value = viewModel.username,
             onValueChange = { viewModel.username = it },

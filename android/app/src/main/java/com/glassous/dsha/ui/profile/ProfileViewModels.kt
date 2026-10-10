@@ -10,8 +10,10 @@ import com.glassous.dsha.R
 import com.glassous.dsha.data.Profile
 import com.glassous.dsha.data.UrlUtils
 import com.glassous.dsha.profileRepository
+import com.glassous.dsha.settingsRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -38,7 +40,11 @@ class ProfileEditViewModel(
 
     val isEditing: Boolean = profileId != null
 
-    var loaded by mutableStateOf(profileId == null)
+    var loaded by mutableStateOf(false)
+        private set
+
+    /** 应用设置：是否使用账号密码；关闭时表单不显示凭据字段也不校验。 */
+    var credentialsEnabled by mutableStateOf(false)
         private set
 
     /** 编辑时保留原有的最近使用时间，避免保存后列表排序跳变。 */
@@ -60,11 +66,13 @@ class ProfileEditViewModel(
         private set
 
     init {
-        if (profileId != null) {
-            viewModelScope.launch {
+        viewModelScope.launch {
+            // 先读设置再放行表单：避免凭据字段先出现再消失的跳动
+            credentialsEnabled = application.settingsRepository.settings.first().credentialsEnabled
+            if (profileId != null) {
                 repository.find(profileId)?.let(::apply)
-                loaded = true
             }
+            loaded = true
         }
     }
 
@@ -75,8 +83,11 @@ class ProfileEditViewModel(
             normalized == null -> R.string.error_base_url_invalid
             else -> null
         }
-        usernameError = if (username.isBlank()) R.string.error_username_required else null
-        passwordError = if (password.isEmpty()) R.string.error_password_required else null
+        // 设置里关闭凭据时不需要账号密码，直接跳过校验（已填写的值原样保留）
+        usernameError =
+            if (credentialsEnabled && username.isBlank()) R.string.error_username_required else null
+        passwordError =
+            if (credentialsEnabled && password.isEmpty()) R.string.error_password_required else null
         if (baseUrlError != null || usernameError != null || passwordError != null) return
 
         saving = true

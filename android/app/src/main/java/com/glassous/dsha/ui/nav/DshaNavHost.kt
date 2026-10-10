@@ -6,14 +6,23 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.glassous.dsha.ui.dshaViewModel
 import com.glassous.dsha.ui.profile.ProfileEditScreen
 import com.glassous.dsha.ui.profile.ProfileListScreen
+import com.glassous.dsha.ui.settings.OnboardingDialog
+import com.glassous.dsha.ui.settings.SettingsScreen
+import com.glassous.dsha.ui.settings.SettingsViewModel
 import com.glassous.dsha.ui.web.WebScreen
 
 /** 路由定义集中在这里，避免各界面硬编码字符串。 */
@@ -23,6 +32,7 @@ object DshaRoutes {
 
     const val PROFILES = "profiles"
     const val EDIT = "edit"
+    const val SETTINGS = "settings"
 
     /** 新建（profileId 缺省）与编辑共用一条路由。 */
     const val EDIT_PATTERN = "$EDIT?$ARG_PROFILE_ID={$ARG_PROFILE_ID}"
@@ -40,6 +50,11 @@ private const val TRANSITION_DURATION_MS = 300
 
 @Composable
 fun DshaNavHost(navController: NavHostController = rememberNavController()) {
+    val settingsViewModel: SettingsViewModel = dshaViewModel { SettingsViewModel(it) }
+    val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
+    // 弹窗被关掉后本次会话不再显示；未点"完成"确认时，下次启动仍会弹出
+    var onboardingDismissed by remember { mutableStateOf(false) }
+
     NavHost(
         navController = navController,
         startDestination = DshaRoutes.PROFILES,
@@ -74,6 +89,7 @@ fun DshaNavHost(navController: NavHostController = rememberNavController()) {
                 onConnect = { profileId -> navController.navigate(DshaRoutes.web(profileId)) },
                 onEdit = { profileId -> navController.navigate(DshaRoutes.edit(profileId)) },
                 onNew = { navController.navigate(DshaRoutes.edit()) },
+                onSettings = { navController.navigate(DshaRoutes.SETTINGS) },
             )
         }
 
@@ -104,5 +120,23 @@ fun DshaNavHost(navController: NavHostController = rememberNavController()) {
                 onBack = { navController.popBackStack() },
             )
         }
+
+        composable(DshaRoutes.SETTINGS) {
+            SettingsScreen(onBack = { navController.popBackStack() })
+        }
+    }
+
+    // 快捷设置：首次启动（尚未完成确认）时弹出；点"完成"保存并标记后才不再出现
+    val currentSettings = settings
+    if (currentSettings != null && !currentSettings.onboardingCompleted && !onboardingDismissed) {
+        OnboardingDialog(
+            initialCredentialsEnabled = currentSettings.credentialsEnabled,
+            initialAdaptiveCompatEnabled = currentSettings.adaptiveCompatEnabled,
+            onDismiss = { onboardingDismissed = true },
+            onConfirm = { credentialsEnabled, adaptiveCompatEnabled ->
+                onboardingDismissed = true
+                settingsViewModel.completeOnboarding(credentialsEnabled, adaptiveCompatEnabled)
+            },
+        )
     }
 }

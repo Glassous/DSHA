@@ -63,6 +63,8 @@ enum class WebEvent {
  * 网页壳本体。WebView 只在 [remember] 中创建一次，
  * 因此调用方需要保证同一个实例只服务同一个连接组（用 `key(profile.id)` 包一层即可）。
  *
+ * @param credentialsEnabled 是否使用连接组里的账号密码应答鉴权与自动填充；关闭时凭据被忽略
+ * @param adaptiveCompatEnabled 是否注入手机端响应式适配；关闭后仅保留基本页面显示
  * @param safeTopDp 状态栏高度（dp）：作为顶部安全距离注入网页内部，顶栏图案才能伸到状态栏底下
  * @param safeBottomDp 导航栏高度（dp）：注入网页内部的底部安全距离；软键盘弹出时传 0（那时视图已被抬起）
  */
@@ -70,6 +72,8 @@ enum class WebEvent {
 fun DshaWebView(
     profile: Profile,
     startUrl: String,
+    credentialsEnabled: Boolean,
+    adaptiveCompatEnabled: Boolean,
     modifier: Modifier = Modifier,
     safeTopDp: Float = 0f,
     safeBottomDp: Float = 0f,
@@ -91,6 +95,9 @@ fun DshaWebView(
     val onBackgroundColorState = rememberUpdatedState(onBackgroundColor)
     val safeTopState = rememberUpdatedState(safeTopDp)
     val safeBottomState = rememberUpdatedState(safeBottomDp)
+    // 设置可能在页面存活期间被改动：WebView 回调里始终读最新值，无需重建 WebView
+    val credentialsEnabledState = rememberUpdatedState(credentialsEnabled)
+    val adaptiveCompatEnabledState = rememberUpdatedState(adaptiveCompatEnabled)
 
     val fileLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -122,6 +129,8 @@ fun DshaWebView(
                 alive = alive,
                 safeTop = { safeTopState.value },
                 safeBottom = { safeBottomState.value },
+                credentialsEnabled = { credentialsEnabledState.value },
+                adaptiveCompatEnabled = { adaptiveCompatEnabledState.value },
                 onCanGoBack = { value -> onCanGoBackState.value(value) },
                 onLoadError = { failed -> onLoadErrorState.value(failed) },
                 onBackgroundColor = { color -> onBackgroundColorState.value(color) },
@@ -161,8 +170,8 @@ fun DshaWebView(
 
     // 状态栏/导航栏/键盘高度变化（旋转、折叠屏、软键盘）时同步刷新注入。
     // 首次加载由 onPageFinished 负责（那时页面才存在），这里只在尺寸确定后跟随 Insets 变化。
-    LaunchedEffect(webView, size, safeTopDp, safeBottomDp) {
-        if (size == null) return@LaunchedEffect
+    LaunchedEffect(webView, size, safeTopDp, safeBottomDp, adaptiveCompatEnabled) {
+        if (size == null || !adaptiveCompatEnabled) return@LaunchedEffect
         applyMobileAdapt(webView, safeTopDp, safeBottomDp)
         applyBottomInset(webView, safeBottomDp)
     }
@@ -350,6 +359,8 @@ private fun buildWebViewClient(
     alive: MutableState<Boolean>,
     safeTop: () -> Float,
     safeBottom: () -> Float,
+    credentialsEnabled: () -> Boolean,
+    adaptiveCompatEnabled: () -> Boolean,
     onCanGoBack: (Boolean) -> Unit,
     onLoadError: (Boolean) -> Unit,
     onBackgroundColor: (Color) -> Unit,
@@ -375,7 +386,8 @@ private fun buildWebViewClient(
     ) {
         val key = "$host|$realm"
         val attempts = authAttempts[key] ?: 0
-        if (profile.username.isBlank() || attempts >= MAX_AUTH_ATTEMPTS) {
+        // 设置里关闭凭据时一律放弃应答：站点确实需要 Basic 鉴权时会走失败流程
+        if (!credentialsEnabled() || profile.username.isBlank() || attempts >= MAX_AUTH_ATTEMPTS) {
             handler.cancel()
             onEvent(WebEvent.AUTH_FAILED)
             return
@@ -398,11 +410,17 @@ private fun buildWebViewClient(
 
     override fun onPageFinished(view: WebView, url: String?) {
         onCanGoBack(view.canGoBack())
-        scheduleAutoFill(view, profile, alive, attempt = 0, onFallback = { onEvent(WebEvent.AUTOFILL_FALLBACK) })
-        applyShellCompat(view)
-        // 顶栏沉浸 + 手机端适配：样式节点按 id 复用，整页加载后重刷一遍数值
-        applyMobileAdapt(view, safeTop(), safeBottom())
-        applyBottomInset(view, safeBottom())
+        // 关闭凭据时不自动填充登录表单
+        if (credentialsEnabled()) {
+            scheduleAutoFill(view, profile, alive, attempt = 0, onFallback = { onEvent(WebEvent.AUTOFILL_FALLBACK) })
+        }
+        // 响应式兼容关闭时仅保留基本页面显示：不注入任何绑定页面结构的适配脚本
+        if (adaptiveCompatEnabled()) {
+            applyShellCompat(view)
+            // 顶栏沉浸 + 手机端适配：样式节点按 id 复用，整页加载后重刷一遍数值
+            applyMobileAdapt(view, safeTop(), safeBottom())
+            applyBottomInset(view, safeBottom())
+        }
         // 每次整页加载完成后重新采样：状态栏图标明暗要跟随网页顶部背景
         sampleBackgroundColor(view, safeTop(), onBackgroundColor)
     }

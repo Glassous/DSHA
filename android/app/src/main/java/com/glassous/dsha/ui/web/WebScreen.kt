@@ -192,6 +192,8 @@ fun WebScreen(
                     DshaWebView(
                         profile = currentProfile,
                         startUrl = currentStartUrl,
+                        credentialsEnabled = viewModel.credentialsEnabled,
+                        adaptiveCompatEnabled = viewModel.adaptiveCompatEnabled,
                         // 铺满整屏（含状态栏区域）：顶部安全高度由注入网页内部的 html padding 承担
                         modifier = Modifier.fillMaxSize(),
                         safeTopDp = safeTopDp,

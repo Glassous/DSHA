@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -74,6 +75,7 @@ fun ProfileListScreen(
     onConnect: (String) -> Unit,
     onEdit: (String) -> Unit,
     onNew: () -> Unit,
+    onSettings: () -> Unit,
 ) {
     val viewModel: ProfilesViewModel = viewModel()
     val profiles by viewModel.profiles.collectAsStateWithLifecycle()
@@ -91,6 +93,14 @@ fun ProfileListScreen(
                     BrandLogo(
                         modifier = Modifier.padding(start = 4.dp),
                     )
+                },
+                actions = {
+                    IconButton(onClick = onSettings) {
+                        Icon(
+                            imageVector = Icons.Filled.Settings,
+                            contentDescription = stringResource(R.string.cd_settings),
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
