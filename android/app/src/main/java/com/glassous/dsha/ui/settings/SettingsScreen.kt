@@ -9,11 +9,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -78,6 +84,10 @@ fun SettingsScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        // 底部沉浸：滚动内容一直画到屏幕底边（含小白条区域），滚动中内容从底边滑出；
+        // 底部安全距离改由滚动内容末尾的 Spacer 承担（见下方 Column），滚到底时最后一项停在小白条之上。
+        // 顶部状态栏由顶栏自己让出，左右挖孔区仍按窗口 insets 让出。
+        contentWindowInsets = WindowInsets.systemBars.only(WindowInsetsSides.Horizontal),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.title_settings)) },
@@ -136,6 +146,9 @@ fun SettingsScreen(
                 onCheckNow = updateViewModel::checkNow,
             )
             Spacer(Modifier.height(8.dp))
+            // 底部安全距离：作为内容末尾的留白随滚动移动——滚到底时最后一项停在小白条之上，
+            // 滚动过程中内容则一直延伸到屏幕底边（沉浸）
+            Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
         }
     }
 
