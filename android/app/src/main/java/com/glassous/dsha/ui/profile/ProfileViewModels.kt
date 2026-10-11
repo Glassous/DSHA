@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.glassous.dsha.R
+import com.glassous.dsha.data.HarnessVersion
 import com.glassous.dsha.data.Profile
 import com.glassous.dsha.data.UrlUtils
 import com.glassous.dsha.profileRepository
@@ -55,6 +56,12 @@ class ProfileEditViewModel(
     var username by mutableStateOf("")
     var password by mutableStateOf("")
     var passwordVisible by mutableStateOf(false)
+
+    /** 本组的网页适配：是否注入手机端响应式适配；关闭时表单不显示版本行。 */
+    var adaptiveCompatEnabled by mutableStateOf(true)
+
+    /** 本组的网页适配：适配所依据的 Harness 版本。 */
+    var harnessVersion by mutableStateOf(HarnessVersion.latest)
 
     var baseUrlError by mutableStateOf<Int?>(null)
         private set
@@ -113,6 +120,8 @@ class ProfileEditViewModel(
         username = username.trim(),
         password = password,
         lastUsedAt = lastUsedAt,
+        adaptiveCompatEnabled = adaptiveCompatEnabled,
+        harnessVersion = harnessVersion,
     )
 
     private fun apply(profile: Profile) {
@@ -121,5 +130,7 @@ class ProfileEditViewModel(
         username = profile.username
         password = profile.password
         lastUsedAt = profile.lastUsedAt
+        adaptiveCompatEnabled = profile.adaptiveCompatEnabled
+        harnessVersion = profile.harnessVersion
     }
 }

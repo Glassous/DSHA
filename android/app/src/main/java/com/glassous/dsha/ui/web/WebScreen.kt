@@ -191,7 +191,9 @@ fun WebScreen(
                         profile = currentProfile,
                         startUrl = currentStartUrl,
                         credentialsEnabled = viewModel.credentialsEnabled,
-                        adaptiveCompatEnabled = viewModel.adaptiveCompatEnabled,
+                        // 网页适配按连接组走：同一个应用可能同时连向不同版本的 Harness
+                        adaptiveCompatEnabled = currentProfile.adaptiveCompatEnabled,
+                        harnessVersion = currentProfile.harnessVersion,
                         // 铺满整屏（含状态栏区域）：顶部安全高度由注入网页内部的 html padding 承担
                         modifier = Modifier.fillMaxSize(),
                         safeTopDp = safeTopDp,

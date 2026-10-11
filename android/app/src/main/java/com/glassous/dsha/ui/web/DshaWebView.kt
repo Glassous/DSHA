@@ -40,8 +40,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.glassous.dsha.data.HarnessVersion
 import com.glassous.dsha.data.Profile
 import com.glassous.dsha.data.UrlUtils
+import com.glassous.dsha.ui.web.adapt.applyBaseAdapt
+import com.glassous.dsha.ui.web.adapt.applyShellCompat
+import com.glassous.dsha.ui.web.adapt.applyVersionAdapt
 import java.util.Locale
 import kotlinx.coroutines.delay
 import org.json.JSONObject
@@ -64,7 +68,9 @@ enum class WebEvent {
  * 因此调用方需要保证同一个实例只服务同一个连接组（用 `key(profile.id)` 包一层即可）。
  *
  * @param credentialsEnabled 是否使用连接组里的账号密码应答鉴权与自动填充；关闭时凭据被忽略
- * @param adaptiveCompatEnabled 是否注入手机端响应式适配；关闭后仅保留基本页面显示
+ * @param adaptiveCompatEnabled 是否注入该版本专属的组件级改造；关闭后不做任何组件改造，
+ *   页面仍由基础注入层（安全区、视口高度链兜底）保证正常显示
+ * @param harnessVersion 版本层适配所依据的 Harness 版本，取自连接组自身
  * @param safeTopDp 状态栏高度（dp）：作为顶部安全距离注入网页内部，顶栏图案才能伸到状态栏底下
  * @param safeBottomDp 导航栏高度（dp）：注入网页内部的底部安全距离；软键盘弹出时传 0（那时视图已被抬起）
  */
@@ -74,6 +80,7 @@ fun DshaWebView(
     startUrl: String,
     credentialsEnabled: Boolean,
     adaptiveCompatEnabled: Boolean,
+    harnessVersion: HarnessVersion,
     modifier: Modifier = Modifier,
     safeTopDp: Float = 0f,
     safeBottomDp: Float = 0f,
@@ -98,6 +105,7 @@ fun DshaWebView(
     // 设置可能在页面存活期间被改动：WebView 回调里始终读最新值，无需重建 WebView
     val credentialsEnabledState = rememberUpdatedState(credentialsEnabled)
     val adaptiveCompatEnabledState = rememberUpdatedState(adaptiveCompatEnabled)
+    val harnessVersionState = rememberUpdatedState(harnessVersion)
 
     val fileLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -131,6 +139,7 @@ fun DshaWebView(
                 safeBottom = { safeBottomState.value },
                 credentialsEnabled = { credentialsEnabledState.value },
                 adaptiveCompatEnabled = { adaptiveCompatEnabledState.value },
+                harnessVersion = { harnessVersionState.value },
                 onCanGoBack = { value -> onCanGoBackState.value(value) },
                 onLoadError = { failed -> onLoadErrorState.value(failed) },
                 onBackgroundColor = { color -> onBackgroundColorState.value(color) },
@@ -170,10 +179,14 @@ fun DshaWebView(
 
     // 状态栏/导航栏/键盘高度变化（旋转、折叠屏、软键盘）时同步刷新注入。
     // 首次加载由 onPageFinished 负责（那时页面才存在），这里只在尺寸确定后跟随 Insets 变化。
-    LaunchedEffect(webView, size, safeTopDp, safeBottomDp, adaptiveCompatEnabled) {
-        if (size == null || !adaptiveCompatEnabled) return@LaunchedEffect
-        applyMobileAdapt(webView, safeTopDp, safeBottomDp)
-        applyBottomInset(webView, safeBottomDp)
+    //
+    // 两层都只按"当次加载时的连接组配置"注入，不做反向清理：适配开关与版本属于连接组，
+    // 只会在重新进入本页（重建 WebView）时改变，本页存活期间不会变。
+    LaunchedEffect(webView, size, safeTopDp, safeBottomDp, adaptiveCompatEnabled, harnessVersion) {
+        if (size == null) return@LaunchedEffect
+        // 基础层无条件施加：它只保证页面能显示，关掉响应式适配后同样需要
+        applyBaseAdapt(webView, safeTopDp, safeBottomDp)
+        if (adaptiveCompatEnabled) applyVersionAdapt(webView, harnessVersion, safeTopDp, safeBottomDp)
     }
 
     // 状态栏图标的明暗要实时跟随网页顶部背景：深浅主题切换、无刷新跳转都可能改底色，
@@ -219,12 +232,6 @@ private const val MAX_AUTH_ATTEMPTS = 3
 private const val AUTOFILL_MAX_ATTEMPTS = 4
 private const val AUTOFILL_RETRY_DELAY_MS = 600L
 private const val AUTOFILL_FALLBACK_DELAY_MS = 4_000L
-private const val SHELL_COMPAT_DELAY_MS = 1_500L
-private const val DIALOG_MIN_SIDE_PX = 2
-private const val DIALOG_MAX_WIDTH_PX = 380
-private const val DIALOG_VIEWPORT_MARGIN_PX = 48
-private const val BOTTOM_INSET_STYLE_ID = "dsha-bottom-inset-style"
-private const val BOTTOM_INSET_VAR = "--dsha-safe-bottom"
 
 /**
  * 注入网页的尺寸一律用 dp：网页 viewport 为 `width=device-width, initial-scale=1`，
@@ -237,102 +244,6 @@ private const val BACKGROUND_SAMPLE_INTERVAL_MS = 500L
 private const val BACKGROUND_IDLE_SAMPLE_INTERVAL_MS = 2_000L
 private const val STABLE_BACKGROUND_ROUNDS = 4
 
-/**
- * 视口单位兜底：部分设备的 WebView 里，以视口为基准的百分比与 `vh` 都会解析成 **0**
- * （JS 侧的 `innerHeight` 却是正常值），于是所有依赖它们的高度/宽度约束都会塌陷。
- * 这里全部改用 JS 读到的像素值，绕过单位解析；只在量到塌陷时才动手，正常环境不受影响。
- *
- * 两处受影响的地方：
- * 1. DSH 的 base.css 用 `html、body、#root { height: 100% }` 逐级传高度（见其底座样式），
- *    整条链塌成 0，界面只剩溢出可见；
- * 2. 它的弹窗卡片是 `width: min(380px, 100%)` + `max-height: 100%`，同样会被算成 0 尺寸，
- *    表现为"只看到背景模糊、看不到弹窗面板"（遮罩用的是 inset 拉伸，所以它没事）。
- *
- * 高度链失效时只能用 JS 量到的像素值兜底，此时 `100%` 不再生效，注入的安全高度
- * （[applyMobileAdapt] 写在 html 上的 padding，由 --dsha-safe-* 暴露）必须显式扣掉，
- * 否则 body/#root 会撑出多余的可滚动空白。
- */
-private val SHELL_COMPAT_JS = """
-    (function () {
-      try {
-        var html = document.documentElement;
-        var body = document.body;
-        var root = document.getElementById('root');
-        var height = Math.round(window.innerHeight || 0);
-        if (height <= 0) { height = Math.round(html.clientHeight || 0); }
-
-        var readInset = function (name) {
-          try {
-            var n = parseFloat(getComputedStyle(html).getPropertyValue(name));
-            return isNaN(n) ? 0 : n;
-          } catch (e) { return 0; }
-        };
-        var insetGap = function () {
-          return Math.max(Math.round(readInset('--dsha-safe-top') + readInset('--dsha-safe-bottom')), 0);
-        };
-
-        var applyRootHeight = function () {
-          var h = Math.round(window.innerHeight || height);
-          if (h <= 0) { return; }
-          var inner = Math.max(h - insetGap(), 0) + 'px';
-          html.style.setProperty('height', h + 'px', 'important');
-          if (body !== null) { body.style.setProperty('height', inner, 'important'); }
-          if (root !== null) { root.style.setProperty('height', inner, 'important'); }
-        };
-
-        var collapsed = height > 0 && (
-          html.getBoundingClientRect().height <= 0 ||
-          (body !== null && body.getBoundingClientRect().height <= 0) ||
-          (root !== null && root.getBoundingClientRect().height === 0));
-        if (collapsed) {
-          window.__dshaRootFixed = true;
-          applyRootHeight();
-          // 前端可能已按塌陷尺寸量过一次，补一次 resize 让它重新测量
-          window.dispatchEvent(new Event('resize'));
-        }
-
-        // 弹窗卡片：量到 0 尺寸才补，等价于它自己想要的 min(380px,100%) / max-height:100%
-        var fixDialogs = function () {
-          var list = document.querySelectorAll('[role=dialog],[role=alertdialog]');
-          var w = Math.max(Math.round(window.innerWidth || 0) - $DIALOG_VIEWPORT_MARGIN_PX, 0);
-          var h = Math.max(Math.round(window.innerHeight || 0) - $DIALOG_VIEWPORT_MARGIN_PX, 0);
-          if (w <= 0 || h <= 0) { return; }
-          var width = Math.min($DIALOG_MAX_WIDTH_PX, w);
-          for (var i = 0; i < list.length; i++) {
-            var el = list[i];
-            var rescued = el.hasAttribute('data-dsha-compat');
-            var rect = el.getBoundingClientRect();
-            // 没量到 0 尺寸的正常弹窗一律不碰；已兜底过的继续跟随视口尺寸
-            if (!rescued && rect.width > $DIALOG_MIN_SIDE_PX && rect.height > $DIALOG_MIN_SIDE_PX) {
-              continue;
-            }
-            if (!rescued) { el.setAttribute('data-dsha-compat', '1'); }
-            el.style.setProperty('width', width + 'px', 'important');
-            el.style.setProperty('height', 'auto', 'important');
-            el.style.setProperty('max-height', h + 'px', 'important');
-          }
-        };
-        fixDialogs();
-
-        if (!window.__dshaCompatBound) {
-          window.__dshaCompatBound = true;
-          var remeasure = function () {
-            if (window.__dshaRootFixed) { applyRootHeight(); }
-            fixDialogs();
-          };
-          window.addEventListener('resize', remeasure);
-          window.addEventListener('orientationchange', function () { setTimeout(remeasure, 300); });
-          // 弹窗是动态挂载到 body 上的，监听 body 的直接子节点变化就够了（不必 subtree，避免流式渲染时频繁触发）
-          if (body !== null && typeof MutationObserver === 'function') {
-            new MutationObserver(fixDialogs).observe(body, { childList: true });
-          }
-        }
-        return 'ok';
-      } catch (e) {
-        return 'error:' + e;
-      }
-    })();
-"""
 
 private fun WebSettings.applySettings() {
     javaScriptEnabled = true
@@ -361,6 +272,7 @@ private fun buildWebViewClient(
     safeBottom: () -> Float,
     credentialsEnabled: () -> Boolean,
     adaptiveCompatEnabled: () -> Boolean,
+    harnessVersion: () -> HarnessVersion,
     onCanGoBack: (Boolean) -> Unit,
     onLoadError: (Boolean) -> Unit,
     onBackgroundColor: (Color) -> Unit,
@@ -414,12 +326,14 @@ private fun buildWebViewClient(
         if (credentialsEnabled()) {
             scheduleAutoFill(view, profile, alive, attempt = 0, onFallback = { onEvent(WebEvent.AUTOFILL_FALLBACK) })
         }
-        // 响应式兼容关闭时仅保留基本页面显示：不注入任何绑定页面结构的适配脚本
+        // 基础层：安全区 + 视口高度链兜底，只保证页面能显示，不碰任何组件；
+        // 与版本、与适配开关都无关，因此放在开关判断之外
+        applyBaseAdapt(view, safeTop(), safeBottom())
+        applyShellCompat(view)
+        // 版本层：该版本专属的组件级改造，按连接组选定的 Harness 版本注入；
+        // 关闭响应式适配时不做任何改造，页面仍按基础层正常显示
         if (adaptiveCompatEnabled()) {
-            applyShellCompat(view)
-            // 顶栏沉浸 + 手机端适配：样式节点按 id 复用，整页加载后重刷一遍数值
-            applyMobileAdapt(view, safeTop(), safeBottom())
-            applyBottomInset(view, safeBottom())
+            applyVersionAdapt(view, harnessVersion(), safeTop(), safeBottom())
         }
         // 每次整页加载完成后重新采样：状态栏图标明暗要跟随网页顶部背景
         sampleBackgroundColor(view, safeTop(), onBackgroundColor)
@@ -528,52 +442,7 @@ private fun buildDownloadListener(
     }
 }
 
-/** 页面稳定后做一次视口单位兜底，并按需持续看护动态挂载的弹窗（详见 [SHELL_COMPAT_JS]）。 */
-private fun applyShellCompat(webView: WebView) {
-    webView.postDelayed({
-        webView.evaluateJavascript(SHELL_COMPAT_JS) { result ->
-            Log.d(TAG, "视口兜底: ${result?.trim('"')}")
-        }
-    }, SHELL_COMPAT_DELAY_MS)
-}
 
-/**
- * 把底部安全距离写进页面：内容让开系统导航栏（小白条）占据的区域。
- *
- * 做法是给 `html` 加 padding-bottom，并用 border-box 让它计入 100% 高度；
- * DSH 前端的 `html`、`body`、`#root` 逐级 100% 的高度链会跟着整体内缩，
- * 而不是被撑出多余滚动。同时暴露 --dsha-safe-bottom 供页面自行取值。
- * 顶部安全距离（状态栏）由 [applyMobileAdapt] 一并注入，单位同为此处的 dp。
- */
-private fun applyBottomInset(webView: WebView, bottomInsetDp: Float) {
-    webView.evaluateJavascript(buildBottomInsetScript(bottomInsetDp)) { result ->
-        Log.d(TAG, "底部安全距离 ${fmtDp(bottomInsetDp)}dp: ${result?.trim('"')}")
-    }
-}
-
-private fun buildBottomInsetScript(bottomInsetDp: Float): String = """
-    (function () {
-      try {
-        var root = document.documentElement;
-        if (!root) { return 'nopage'; }
-        var bottom = ${fmtDp(bottomInsetDp)};
-        var style = document.getElementById('$BOTTOM_INSET_STYLE_ID');
-        if (!style) {
-          style = document.createElement('style');
-          style.id = '$BOTTOM_INSET_STYLE_ID';
-          (document.head || root).appendChild(style);
-        }
-        style.textContent = bottom > 0
-          ? 'html{padding-bottom:' + bottom + 'px !important;box-sizing:border-box !important;}'
-          : '';
-        root.style.setProperty('$BOTTOM_INSET_VAR', bottom + 'px');
-        window.dispatchEvent(new Event('resize'));
-        return 'ok';
-      } catch (e) {
-        return 'error:' + e;
-      }
-    })();
-""".trimIndent()
 
 /**
  * 采样网页顶部背景色，用于决定状态栏图标的明暗（沉浸后状态栏直接浮在网页上）。

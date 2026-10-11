@@ -47,6 +47,8 @@ import androidx.compose.ui.unit.dp
 import com.glassous.dsha.R
 import com.glassous.dsha.ui.clearFocusOnTap
 import com.glassous.dsha.ui.dshaViewModel
+import com.glassous.dsha.ui.settings.LinkSettingCard
+import com.glassous.dsha.ui.settings.SwitchSettingCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +60,7 @@ fun ProfileEditScreen(
         ProfileEditViewModel(application, profileId)
     }
     var confirmDelete by remember { mutableStateOf(false) }
+    var versionPickerVisible by remember { mutableStateOf(false) }
 
     Scaffold(
         // 点击顶部栏、表单间隙等非输入区域时收起键盘
@@ -123,6 +126,11 @@ fun ProfileEditScreen(
         ) {
             BasicInfoFields(viewModel)
 
+            WebAdaptFields(
+                viewModel = viewModel,
+                onPickVersion = { versionPickerVisible = true },
+            )
+
             Button(
                 onClick = { viewModel.save(onBack) },
                 enabled = !viewModel.saving,
@@ -152,6 +160,17 @@ fun ProfileEditScreen(
                     Text(stringResource(R.string.action_cancel))
                 }
             },
+        )
+    }
+
+    if (versionPickerVisible) {
+        HarnessVersionPickerDialog(
+            current = viewModel.harnessVersion,
+            onSelect = { version ->
+                viewModel.harnessVersion = version
+                versionPickerVisible = false
+            },
+            onDismiss = { versionPickerVisible = false },
         )
     }
 }
@@ -257,6 +276,48 @@ private fun CredentialsFields(viewModel: ProfileEditViewModel) {
             shape = RoundedCornerShape(20.dp),
             modifier = Modifier.fillMaxWidth(),
         )
+    }
+}
+
+/**
+ * 网页适配：本组专属的响应式适配开关与 Harness 版本。
+ *
+ * 版本行只在开启适配后出现——关闭适配后不做任何组件改造，此时选哪个版本都没有意义，
+ * 露出来反而像是还有一项要配。行样式与设置页一致（大标题 + 小描述 + 右侧开关/箭头），
+ * 两处观感统一。
+ */
+@Composable
+private fun WebAdaptFields(
+    viewModel: ProfileEditViewModel,
+    onPickVersion: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.section_web_adapt),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        SwitchSettingCard(
+            title = stringResource(R.string.setting_adaptive_title),
+            description = stringResource(R.string.setting_adaptive_desc),
+            checked = viewModel.adaptiveCompatEnabled,
+            onCheckedChange = { viewModel.adaptiveCompatEnabled = it },
+        )
+
+        if (viewModel.adaptiveCompatEnabled) {
+            LinkSettingCard(
+                title = stringResource(R.string.setting_harness_version_title),
+                description = stringResource(
+                    R.string.setting_harness_version_desc,
+                    viewModel.harnessVersion.label,
+                ),
+                onClick = onPickVersion,
+            )
+        }
     }
 }
 

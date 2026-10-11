@@ -42,9 +42,15 @@
     <string name="cd_settings">Settings</string>
     <string name="setting_credentials_title">Use username and password</string>
     <string name="setting_credentials_desc">DeepSeek Harness has no login of its own; turn this on only when the service sits behind Basic auth such as a 1Panel reverse proxy. When off, the app opens the service directly and saved credentials are ignored.</string>
-    <string name="setting_adaptive_title">Responsive compatibility</string>
-    <string name="setting_adaptive_desc">Injects a mobile responsive adaptation for DeepSeek Harness 0.2.0-rc.2. If pages look broken after a Harness update, turn this off to keep the basic page layout.</string>
+    <string name="setting_adaptive_title">Responsive adaptation</string>
+    <string name="setting_adaptive_desc">Restructures the DeepSeek Harness web page of this connection for phone screens; the adapted version is chosen below. When off, page components are left as they are, and the page still displays normally.</string>
     <string name="setting_credentials_disabled_hint">Username and password are turned off in Settings and will not be used</string>
+
+    <!-- Web adaptation (per connection) -->
+    <string name="section_web_adapt">Web adaptation</string>
+    <string name="setting_harness_version_title">Harness version</string>
+    <!-- %1$s: the adapted DeepSeek Harness version of this connection, e.g. "0.2.0-rc.2" -->
+    <string name="setting_harness_version_desc">Adapted for DeepSeek Harness %1$s</string>
 
     <!-- Language: each language is written in its own language, so these two names stay untranslated -->
     <string name="title_language">Language</string>
@@ -75,7 +81,7 @@
     <string name="agreement_accept_checkbox">I have read and accept the User agreement</string>
     <string name="agreement_accept">Accept and continue</string>
 
-    <!-- Quick setup (first launch, four pages: language, user agreement, credentials, responsive compatibility) -->
+    <!-- Quick setup (first launch, three pages: language, user agreement, credentials) -->
     <string name="onboarding_title">A couple of quick settings</string>
     <string name="onboarding_language_desc">Choose the language used by the interface. The interface updates right away, and you can change it later in Settings.</string>
     <string name="onboarding_next">Next</string>

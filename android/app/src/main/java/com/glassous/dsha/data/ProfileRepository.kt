@@ -73,7 +73,11 @@ class ProfileRepository(context: Context) {
                     .put("baseUrl", profile.baseUrl)
                     .put("username", profile.username)
                     .put("password", profile.password)
-                    .put("lastUsedAt", profile.lastUsedAt),
+                    .put("lastUsedAt", profile.lastUsedAt)
+                    // 只存版本号本身：读取时由 HarnessVersion.fromStored 找回枚举，
+                    // 已下线的版本号会自然回退到当前适配的最高版本
+                    .put("harnessVersion", profile.harnessVersion.label)
+                    .put("adaptiveCompatEnabled", profile.adaptiveCompatEnabled),
             )
         }
         return array.toString()
@@ -92,6 +96,9 @@ class ProfileRepository(context: Context) {
                     username = item.optString("username"),
                     password = item.optString("password"),
                     lastUsedAt = item.optLong("lastUsedAt"),
+                    // 旧数据没有这两个键：默认开启适配 + 当前适配的最高版本，与加入该设置前的行为一致
+                    adaptiveCompatEnabled = item.optBoolean("adaptiveCompatEnabled", true),
+                    harnessVersion = HarnessVersion.fromStored(item.optString("harnessVersion")),
                 )
             }
         }

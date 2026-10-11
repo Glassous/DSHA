@@ -45,10 +45,6 @@ class WebViewModel(
     var credentialsEnabled by mutableStateOf(false)
         private set
 
-    /** 应用设置：是否注入针对 Harness 0.2.0-rc.2 的手机端响应式适配（默认开启）。 */
-    var adaptiveCompatEnabled by mutableStateOf(true)
-        private set
-
     /**
      * 重新加载前重置状态：让启动动画完整重走一遍。
      * progress 归零是必需的——即使旧值已是 100，也要让监听进度的 effect 重新触发。
@@ -61,11 +57,11 @@ class WebViewModel(
     }
 
     init {
-        // 应用级设置与连接组并行读取：两者都先于 WebView 创建（loading 阶段）完成
+        // 应用级设置与连接组并行读取：两者都先于 WebView 创建（loading 阶段）完成。
+        // 网页适配（开关与 Harness 版本）随连接组来，不在应用设置里。
         viewModelScope.launch {
             val appSettings = application.settingsRepository.settings.first()
             credentialsEnabled = appSettings.credentialsEnabled
-            adaptiveCompatEnabled = appSettings.adaptiveCompatEnabled
         }
         viewModelScope.launch {
             val found = repository.find(profileId)

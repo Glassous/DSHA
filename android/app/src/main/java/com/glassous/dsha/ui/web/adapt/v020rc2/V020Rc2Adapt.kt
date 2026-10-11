@@ -1,117 +1,12 @@
-package com.glassous.dsha.ui.web
+package com.glassous.dsha.ui.web.adapt.v020rc2
 
-import android.util.Log
-import android.webkit.WebView
-import java.util.Locale
-
-/**
- * 网页外壳注入层：手机端响应式适配 + 顶栏沉浸。
- *
- * 网页（DeepSeek Harness）本身是桌面外壳：`#root` 内一个 CSS Grid 框架元素带内联
- * `grid-template-columns: 280px minmax(0px,1fr) minmax(0px,0px)`，没有任务媒体查询，
- * 因此在手机宽度下会话区被挤到 110px 左右。这里的做法是不改网页源码，只注入 CSS/JS：
- *
- * 1. 手机（视口 < 600 CSS px，等价 Android sw600dp 平板分界）下把三栏改成单栏 + 覆盖式抽屉；
- * 2. 手机下把设置弹窗左侧的标签导航搬到顶部，图标在上、文字在下；
- * 3. 全宽度下把状态栏安全高度注入网页内部（`html` 的 padding），让网页真正铺到状态栏底下。
- *
- * 单位说明：网页 viewport 为 `width=device-width, initial-scale=1`，即 1 CSS px = 1 dp，
- * 因此这里注入的插值一律是 **dp 值**，不能传物理像素。
- */
-private const val TAG = "DshaMobileAdapt"
-
-/** 手机断点上限（CSS px = dp），与 Android sw600dp 平板分界对齐；600dp 恰为平板，故媒体查询取 599.98px。 */
-private const val MOBILE_MEDIA_LIMIT = "599.98"
-
-private const val ADAPT_STYLE_ID = "dsha-mobile-adapt"
-private const val SCRIM_ID = "dsha-drawer-scrim"
-private const val NAV_ID = "dsha-sidebar-button"
-private const val SETTINGS_FLAG_ATTR = "data-dsha-settings"
-
-private const val TOKEN_TOP = "__DSHA_SAFE_TOP__"
-private const val TOKEN_BOTTOM = "__DSHA_SAFE_BOTTOM__"
-private const val TOKEN_LIMIT = "__DSHA_MOBILE_LIMIT__"
-private const val TOKEN_STYLE_ID = "__DSHA_STYLE_ID__"
-private const val TOKEN_SCRIM_ID = "__DSHA_SCRIM_ID__"
-private const val TOKEN_NAV_ID = "__DSHA_NAV_ID__"
-private const val TOKEN_SETTINGS_ATTR = "__DSHA_SETTINGS_ATTR__"
-private const val TOKEN_CSS = "__DSHA_CSS__"
-
-/**
- * 注入手机端适配样式、沉浸式顶部安全高度与外壳保活脚本。
- *
- * 幂等：样式节点与遮罩节点按 id 复用，重复调用只刷新数值，不叠加 DOM。
- *
- * @param safeTopDp 状态栏高度（dp，即网页 CSS px）
- * @param safeBottomDp 导航栏高度（dp，即网页 CSS px）
- */
-fun applyMobileAdapt(webView: WebView, safeTopDp: Float, safeBottomDp: Float) {
-    val script = buildScript(safeTopDp, safeBottomDp)
-    webView.evaluateJavascript(script) { result ->
-        Log.d(TAG, "applyMobileAdapt top=${fmt(safeTopDp)} bottom=${fmt(safeBottomDp)} -> $result")
-    }
-}
-
-private fun buildScript(safeTopDp: Float, safeBottomDp: Float): String {
-    val tokens = mapOf(
-        TOKEN_TOP to fmt(safeTopDp),
-        TOKEN_BOTTOM to fmt(safeBottomDp),
-        TOKEN_LIMIT to MOBILE_MEDIA_LIMIT,
-        TOKEN_STYLE_ID to ADAPT_STYLE_ID,
-        TOKEN_SCRIM_ID to SCRIM_ID,
-        TOKEN_NAV_ID to NAV_ID,
-        TOKEN_SETTINGS_ATTR to SETTINGS_FLAG_ATTR,
-    )
-    val css = tokens.entries.fold(ADAPT_CSS) { acc, (key, value) -> acc.replace(key, value) }
-    val script = tokens.entries.fold(ADAPT_JS) { acc, (key, value) -> acc.replace(key, value) }
-    return script.replace(TOKEN_CSS, css.toJsStringLiteral())
-}
-
-private fun fmt(value: Float): String = String.format(Locale.US, "%.2f", value)
-
-/**
- * 折成 JS 字符串字面量：CSS 里的换行会破坏字面量，双引号与反斜杠需要转义。
- */
-private fun String.toJsStringLiteral(): String {
-    val body = replace("\\", "\\\\")
-        .replace("\"", "\\\"")
-        .replace("\r", " ")
-        .replace("\n", " ")
-    return "\"" + body + "\""
-}
+import com.glassous.dsha.ui.web.adapt.VersionAdapt
 
 /**
  * 注入的样式。选择器一律使用稳定的类名/属性**后缀**锚点（`[class$=_sidebarCol]` 等），
  * 不碰构建哈希前缀（`pI_x6G_` / `VOzbGW_` 会随构建变化）。
  */
-private val ADAPT_CSS = """
-/* ===== 沉浸：网页伸入状态栏，安全高度注入网页内部 =====
-   html 走 border-box 且高度锁定 100%，因此 padding-top 计入自身高度：
-   页面总高不变（不产生多余上下滚动），可视内容整体下移，净内容高度与改动前等价。 */
-html {
-  padding-top: __DSHA_SAFE_TOP__px !important;
-  box-sizing: border-box !important;
-  height: 100% !important;
-  --dsha-safe-top: __DSHA_SAFE_TOP__px;
-  --dsha-safe-bottom: __DSHA_SAFE_BOTTOM__px;
-  --dsh-frame-overlay-top: calc(__DSHA_SAFE_TOP__px + 12px);
-}
-/* 画布底色（状态栏那一条露出的就是它）跟随网页明暗，避免与应用背景出现色差 */
-body {
-  background-color: var(--dsw-alias-bg-base, #fff) !important;
-}
-/* 触屏点击不再出现系统的蓝色高亮块：该属性不继承，应用自身也只在部分组件上关掉了 */
-html,
-body,
-* {
-  -webkit-tap-highlight-color: transparent !important;
-}
-/* 应用内全屏浮层（设置弹窗等，position:fixed）不受 html padding 影响，需各自避让；
-   遮罩是 absolute inset:0，相对 padding box 定位，仍然铺满整屏。 */
-[class$=_overlay] {
-  padding-top: __DSHA_SAFE_TOP__px !important;
-  box-sizing: border-box !important;
-}
+private val V020RC2_CSS = """
 /* 抽屉遮罩：位于抽屉之下、内容之上。
    起点在顶栏下沿：顶栏按钮不会被盖住，也就不必给顶栏加定位层级——
    顶栏一旦成为定位元素，锚在它内部的绝对定位浮层会跟着改定位基准。 */
@@ -391,7 +286,7 @@ body,
  * 抽屉显隐复用应用自身状态（`data-sidebar-collapsed` / `data-rightbar-collapsed`），
  * 所以侧栏里的「收起侧边栏」与顶部的「打开右侧边栏」等按钮天然成为抽屉开关，无需新增按钮。
  */
-private val ADAPT_JS = """
+private val V020RC2_JS = """
 (function () {
   try {
     var top = __DSHA_SAFE_TOP__, bottom = __DSHA_SAFE_BOTTOM__, limit = __DSHA_MOBILE_LIMIT__;
@@ -809,3 +704,25 @@ private val ADAPT_JS = """
   }
 })();
 """
+
+/**
+ * DeepSeek Harness 0.2.0-rc.2 的定制适配：这个版本专属的组件级改造注入。
+ *
+ * 目录约定：`ui/web/adapt/` 下每个已适配版本各占一个目录（如本目录 `v020rc2/`），
+ * 目录里只放这个版本的 CSS 与 JS。不同版本的页面结构、类名和可用的驱动方式都可能不同，
+ * 分目录存放后改一个版本不会波及其它版本，新增版本也只是多一个目录。
+ *
+ * 本版本的页面结构：`#root` 内一个 CSS Grid 框架元素带内联
+ * `grid-template-columns: 280px minmax(0px,1fr) minmax(0px,0px)`，没有任何媒体查询，
+ * 因此手机宽度下会话区被挤到 110px 左右。这里的做法是不改网页源码，只注入 CSS/JS：
+ *
+ * 1. 手机（视口 < 600 CSS px，等价 Android sw600dp 平板分界）下把三栏改成单栏 + 覆盖式抽屉；
+ * 2. 手机下把设置弹窗左侧的标签导航搬到顶部，图标在上、文字在下。
+ *
+ * 外壳级的安全区与视口塌陷兜底不在这里，见 `adapt/BaseAdapt.kt`：那些与版本无关，
+ * 且关掉响应式适配后也必须继续施加。
+ *
+ * 单位说明：网页 viewport 为 `width=device-width, initial-scale=1`，即 1 CSS px = 1 dp，
+ * 因此这里注入的插值一律是 **dp 值**，不能传物理像素。
+ */
+internal val V020Rc2Adapt = VersionAdapt(css = V020RC2_CSS, js = V020RC2_JS)

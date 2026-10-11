@@ -11,18 +11,18 @@ import kotlinx.coroutines.withContext
 /**
  * 应用级设置。
  *
+ * 网页适配（响应式适配开关与 Harness 版本）不在这里：它随连接组存放，
+ * 因为同一个应用可能同时连向不同版本的 Harness，见 [Profile]。
+ *
  * @param credentialsEnabled 是否使用连接组里的账号密码。DeepSeek Harness 本身没有登录模块，
  *   账号密码只是 1Panel 等反向代理在入口加 Basic 鉴权的产物，默认关闭；
  *   关闭后连接直接进入，已填写的凭据会被忽略。
- * @param adaptiveCompatEnabled 是否注入针对 DeepSeek Harness 0.2.0-rc.2 的手机端响应式适配。
- *   适配深度绑定该版本的页面结构，Harness 更新后可能反而引入问题，关闭后仅保留基本页面显示。
  * @param onboardingCompleted 首次启动的快捷设置是否已完成确认；未确认（含中途退出）时每次启动都会再弹。
  * @param agreementAccepted 用户协议是否已同意。未同意时快捷设置停在协议页、应用不可用；
  *   同意后不再要求，协议内容仍可在设置页随时查看。
  */
 data class AppSettings(
     val credentialsEnabled: Boolean = false,
-    val adaptiveCompatEnabled: Boolean = true,
     val onboardingCompleted: Boolean = false,
     val agreementAccepted: Boolean = false,
 )
@@ -42,15 +42,12 @@ class SettingsRepository(context: Context) {
 
     suspend fun setCredentialsEnabled(enabled: Boolean) = write(KEY_CREDENTIALS, enabled)
 
-    suspend fun setAdaptiveCompatEnabled(enabled: Boolean) = write(KEY_ADAPTIVE_COMPAT, enabled)
-
     suspend fun setOnboardingCompleted(completed: Boolean) = write(KEY_ONBOARDING, completed)
 
     suspend fun setAgreementAccepted(accepted: Boolean) = write(KEY_AGREEMENT, accepted)
 
     private fun read(): AppSettings = AppSettings(
         credentialsEnabled = prefs.getBoolean(KEY_CREDENTIALS, false),
-        adaptiveCompatEnabled = prefs.getBoolean(KEY_ADAPTIVE_COMPAT, true),
         onboardingCompleted = prefs.getBoolean(KEY_ONBOARDING, false),
         agreementAccepted = prefs.getBoolean(KEY_AGREEMENT, false),
     )
@@ -69,7 +66,6 @@ class SettingsRepository(context: Context) {
         const val TAG = "SettingsRepository"
         const val PREFS_NAME = "dsha_settings"
         const val KEY_CREDENTIALS = "credentials_enabled"
-        const val KEY_ADAPTIVE_COMPAT = "adaptive_compat_enabled"
         const val KEY_ONBOARDING = "onboarding_completed"
         const val KEY_AGREEMENT = "agreement_accepted"
     }

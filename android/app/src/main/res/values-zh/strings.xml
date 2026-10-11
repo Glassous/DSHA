@@ -38,9 +38,15 @@
     <string name="cd_settings">设置</string>
     <string name="setting_credentials_title">使用账号密码</string>
     <string name="setting_credentials_desc">DeepSeek Harness 本身没有登录模块；仅当服务由 1Panel 等反向代理加了 Basic 鉴权时才需要开启。关闭后直接进入，已填写的凭据会被忽略。</string>
-    <string name="setting_adaptive_title">响应式兼容</string>
-    <string name="setting_adaptive_desc">注入针对 DeepSeek Harness 0.2.0-rc.2 的手机端响应式适配。Harness 更新后如出现显示异常，可关闭此项，仅保留基本页面显示。</string>
+    <string name="setting_adaptive_title">响应式适配</string>
+    <string name="setting_adaptive_desc">为本连接组把 DeepSeek Harness 网页改造成适合手机宽度的结构，适配版本在下方选择。关闭后不对页面组件做改造，页面仍正常显示。</string>
     <string name="setting_credentials_disabled_hint">账号密码已在设置中关闭，连接时不会使用</string>
+
+    <!-- 网页适配（按连接组） -->
+    <string name="section_web_adapt">网页适配</string>
+    <string name="setting_harness_version_title">Harness 版本</string>
+    <!-- %1$s：本连接组适配的 DeepSeek Harness 版本号，如 0.2.0-rc.2 -->
+    <string name="setting_harness_version_desc">适配 DeepSeek Harness %1$s</string>
 
     <!-- 语言（简体中文名不参与翻译，见 values/strings.xml） -->
     <string name="title_language">语言</string>
@@ -69,7 +75,7 @@
     <string name="agreement_accept_checkbox">我已阅读并同意《用户协议》</string>
     <string name="agreement_accept">同意并继续</string>
 
-    <!-- 快捷设置（首次启动，四页：语言、用户协议、账号密码、响应式兼容） -->
+    <!-- 快捷设置（首次启动，三页：语言、用户协议、账号密码） -->
     <string name="onboarding_title">先进行几个设置吧</string>
     <string name="onboarding_language_desc">选择界面显示的语言，选中后界面会立即切换，之后也可随时在设置里修改。</string>
     <string name="onboarding_next">下一步</string>

@@ -113,12 +113,6 @@ fun SettingsScreen(onBack: () -> Unit) {
                 checked = current.credentialsEnabled,
                 onCheckedChange = viewModel::setCredentialsEnabled,
             )
-            SwitchSettingCard(
-                title = stringResource(R.string.setting_adaptive_title),
-                description = stringResource(R.string.setting_adaptive_desc),
-                checked = current.adaptiveCompatEnabled,
-                onCheckedChange = viewModel::setAdaptiveCompatEnabled,
-            )
             LinkSettingCard(
                 title = stringResource(R.string.setting_language_title),
                 description = appLanguage.optionName(deviceLanguage),
@@ -151,7 +145,8 @@ fun SettingsScreen(onBack: () -> Unit) {
 }
 
 /**
- * 设置页里的一项开关：卡片外壳 + 大标题 + 小描述 + 右侧开关；整行可点，开关自身不重复响应。
+ * 一项开关：卡片外壳 + 大标题 + 小描述 + 右侧开关；整行可点，开关自身不重复响应。
+ * 设置页与连接组编辑页共用（后者用它承载响应式适配开关）。
  */
 @Composable
 fun SwitchSettingCard(
@@ -206,9 +201,12 @@ private fun RowScope.SwitchSettingContent(
     )
 }
 
-/** 设置页里的一项跳转：卡片外壳 + 大标题 + 小描述 + 右侧箭头，用于打开查看类页面或弹窗。 */
+/**
+ * 一项跳转/选择：卡片外壳 + 大标题 + 小描述 + 右侧箭头，用于打开查看类页面或弹窗。
+ * 设置页与连接组编辑页共用（后者用它承载 Harness 版本选择）。
+ */
 @Composable
-private fun LinkSettingCard(
+fun LinkSettingCard(
     title: String,
     description: String,
     onClick: () -> Unit,
@@ -275,20 +273,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch { repository.setCredentialsEnabled(enabled) }
     }
 
-    fun setAdaptiveCompatEnabled(enabled: Boolean) {
-        viewModelScope.launch { repository.setAdaptiveCompatEnabled(enabled) }
-    }
-
     /** 快捷设置第一页同意用户协议：记下后本次即可继续，之后启动不再要求同意。 */
     fun acceptAgreement() {
         viewModelScope.launch { repository.setAgreementAccepted(true) }
     }
 
-    /** 快捷设置确认：保存两项开关并标记完成，之后启动不再弹出。 */
-    fun completeOnboarding(credentialsEnabled: Boolean, adaptiveCompatEnabled: Boolean) {
+    /** 快捷设置确认：保存开关并标记完成，之后启动不再弹出。 */
+    fun completeOnboarding(credentialsEnabled: Boolean) {
         viewModelScope.launch {
             repository.setCredentialsEnabled(credentialsEnabled)
-            repository.setAdaptiveCompatEnabled(adaptiveCompatEnabled)
             repository.setOnboardingCompleted(true)
         }
     }

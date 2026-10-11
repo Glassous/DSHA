@@ -206,13 +206,12 @@ fun DshaNavHost(navController: NavHostController = rememberNavController()) {
     if (onboardingSettings != null) {
         OnboardingDialog(
             initialCredentialsEnabled = onboardingSettings.credentialsEnabled,
-            initialAdaptiveCompatEnabled = onboardingSettings.adaptiveCompatEnabled,
             initialAgreementAccepted = onboardingSettings.agreementAccepted,
             onDismiss = { onboardingDismissed = true },
             onAgreementAccepted = settingsViewModel::acceptAgreement,
-            onConfirm = { credentialsEnabled, adaptiveCompatEnabled ->
+            onConfirm = { credentialsEnabled ->
                 onboardingDismissed = true
-                settingsViewModel.completeOnboarding(credentialsEnabled, adaptiveCompatEnabled)
+                settingsViewModel.completeOnboarding(credentialsEnabled)
             },
         )
     }
