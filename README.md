@@ -8,6 +8,10 @@
 
 **DSHA** is a lightweight Android shell for your own DeepSeek Harness (DSH) deployment. You save the service address — plus a username and password if the deployment sits behind Basic auth — and DSHA opens that page in a full-screen WebView, injecting CSS/JS so the desktop-first DSH web UI works properly on a phone.
 
+<p align="center">
+  <img src="docs/screenshots/sidebar.jpg" alt="DSHA running a DSH deployment on an Android phone" width="320">
+</p>
+
 ## Features
 
 - **Connection profiles** — save any number of DSH addresses. Each one gets an optional name (the host name is used when it is left blank), its own credentials, its own adaptation settings, and a "last opened" timestamp.
@@ -95,7 +99,7 @@ android/
 ├── gradle/libs.versions.toml            # version catalog
 ├── gradle/wrapper/                      # Gradle 9.5.0 wrapper
 └── settings.gradle.kts
-docs/                                    # brand assets
+docs/                                    # brand assets and screenshots
 ```
 
 ## Data and privacy

@@ -8,6 +8,10 @@
 
 **DSHA** 是你自建 DeepSeek Harness（DSH）服务的轻量 Android 外壳。填入服务地址（若服务位于 Basic 鉴权之后，再填用户名与密码），DSHA 就会在全屏 WebView 中打开该页面，并注入 CSS/JS，让按桌面端设计的 DSH 网页在手机上正常可用。
 
+<p align="center">
+  <img src="docs/screenshots/sidebar.jpg" alt="DSHA 在 Android 手机上运行的 DSH 界面" width="320">
+</p>
+
 ## 功能
 
 - **连接组** — 可保存任意多个 DSH 地址，每个连接组有独立的名字（留空时回退为主机名）、独立的账号密码、独立的适配设置，以及「上次打开」时间。
@@ -95,7 +99,7 @@ android/
 ├── gradle/libs.versions.toml            # 版本目录
 ├── gradle/wrapper/                      # Gradle 9.5.0 wrapper
 └── settings.gradle.kts
-docs/                                    # 品牌资源
+docs/                                    # 品牌资源与截图
 ```
 
 ## 数据与隐私
