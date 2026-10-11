@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,7 +23,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -50,9 +48,14 @@ private val CARD_SHADOW_ELEVATION = 8.dp
 /** 长日志的正文最多占屏幕高度的比例：超出部分在卡片内滚动，按钮始终留在屏幕里。 */
 private const val CHANGELOG_MAX_HEIGHT_RATIO = 0.42f
 
+/** 两行按钮之间的纵向间距。 */
+private val ACTION_ROW_SPACING = 4.dp
+
 /**
  * 有新版本的弹窗：标题是版本号，正文是 GitHub 发布说明（Markdown），
  * 三个动作分别是取消（本次不提示）、忽略此版本（以后不再提示该版本）与下载（浏览器直链下载）。
+ * 按钮分两行：第一行取消居左、下载居右，忽略此版本在第二行靠右——英文按钮文案长，
+ * 三个挤一行会把按钮压到换行。
  */
 @Composable
 fun UpdateDialog(
@@ -77,16 +80,26 @@ fun UpdateDialog(
             )
         },
         actions = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
+            // 第一行两端对齐：取消居左、下载居右；忽略此版本单独一行靠右
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+                Button(onClick = { openInBrowser(context, release.downloadUrl) }) {
+                    Text(stringResource(R.string.update_action_download))
+                }
             }
-            TextButton(onClick = onIgnore) {
-                Text(stringResource(R.string.update_action_ignore))
-            }
-            // 中间留一段弹性空档，把下载按钮顶到右侧
-            Spacer(Modifier.weight(1f))
-            Button(onClick = { openInBrowser(context, release.downloadUrl) }) {
-                Text(stringResource(R.string.update_action_download))
+            Spacer(Modifier.height(ACTION_ROW_SPACING))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = onIgnore) {
+                    Text(stringResource(R.string.update_action_ignore))
+                }
             }
         },
     )
@@ -113,21 +126,25 @@ fun UpdateMessageDialog(
             )
         },
         actions = {
-            Spacer(Modifier.weight(1f))
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_close))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.action_close))
+                }
             }
         },
     )
 }
 
-/** 两款更新弹窗共用的卡片外壳：尺寸、留白、按钮行都一致，只有正文与按钮不同。 */
+/** 两款更新弹窗共用的卡片外壳：尺寸、留白、按钮区都一致，只有正文与按钮不同。 */
 @Composable
 private fun UpdateDialogCard(
     title: String,
     onDismiss: () -> Unit,
     body: @Composable ColumnScope.() -> Unit,
-    actions: @Composable RowScope.() -> Unit,
+    actions: @Composable ColumnScope.() -> Unit,
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -151,10 +168,8 @@ private fun UpdateDialogCard(
                 Spacer(Modifier.height(CARD_SECTION_SPACING))
                 body()
                 Spacer(Modifier.height(CARD_SECTION_SPACING))
-                Row(
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     content = actions,
                 )
             }

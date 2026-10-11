@@ -92,6 +92,16 @@ fun Context.currentAppLanguage(): AppLanguage {
 }
 
 /**
+ * 当前生效的语言码（`"zh"` / `"en"`），供远端文案（如 GitHub 发布的更新说明）挑选语言：
+ * 指定了内置语言就是它；跟随系统时看设备语言，中文之外一律按英文——与资源的默认值一致。
+ */
+fun Context.currentLanguageCode(): String = when (currentAppLanguage()) {
+    AppLanguage.CHINESE -> "zh"
+    AppLanguage.ENGLISH -> "en"
+    AppLanguage.SYSTEM -> if (deviceLanguageCode() == "zh") "zh" else "en"
+}
+
+/**
  * 切换应用语言：只把选择交给系统。语言变化会作为配置变更让 Activity 重建，
  * 资源随之切换，这里不需要自己 recreate。
  */

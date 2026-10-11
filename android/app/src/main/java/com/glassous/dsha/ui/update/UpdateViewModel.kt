@@ -11,6 +11,7 @@ import com.glassous.dsha.data.ReleaseInfo
 import com.glassous.dsha.data.SemanticVersion
 import com.glassous.dsha.data.UpdateChecker
 import com.glassous.dsha.settingsRepository
+import com.glassous.dsha.ui.settings.currentLanguageCode
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -70,7 +71,7 @@ class UpdateViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             val settings = settingsRepository.settings.first()
             if (!settings.autoUpdateCheck) return@launch
-            val latest = UpdateChecker.latestRelease() ?: return@launch
+            val latest = UpdateChecker.latestRelease(app.currentLanguageCode()) ?: return@launch
             if (latest.version == settings.ignoredUpdateVersion) return@launch
             if (!SemanticVersion.isNewer(latest.version, currentVersion)) return@launch
             // 迟到的自动检测结果不覆盖用户已经发起的操作：手动检测进了设置页，就别再插一脚
@@ -83,7 +84,7 @@ class UpdateViewModel(application: Application) : AndroidViewModel(application) 
         if (state == UpdateState.Checking) return
         state = UpdateState.Checking
         viewModelScope.launch {
-            val latest = UpdateChecker.latestRelease()
+            val latest = UpdateChecker.latestRelease(app.currentLanguageCode())
             state = when {
                 latest == null -> UpdateState.Failed
                 SemanticVersion.isNewer(latest.version, currentVersion) -> UpdateState.Available(latest)
