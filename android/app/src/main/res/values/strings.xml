@@ -1,98 +1,106 @@
 <resources>
+    <!--
+      默认文案为英文：简体中文在 values-zh/，其它语言的设备一律回落到这里。
+      因此这里同时也是新增文案的"基准"版本，缺失的翻译会以英文显示。
+    -->
     <string name="app_name">DSHA</string>
     <string name="app_title">DeepSeek Harness</string>
 
-    <!-- 组列表 -->
-    <string name="profile_empty_title">还没有连接组</string>
-    <string name="profile_empty_desc">添加第一个地址与凭据，之后一键进入服务网页</string>
-    <string name="profile_last_launched">上次启动</string>
-    <string name="action_edit">编辑</string>
-    <string name="action_delete">删除</string>
-    <string name="action_save">保存</string>
-    <string name="action_cancel">取消</string>
-    <string name="action_back">返回</string>
-    <string name="action_close">关闭</string>
-    <string name="action_retry">重试</string>
-    <string name="action_show_password">显示</string>
-    <string name="action_hide_password">隐藏</string>
+    <!-- Connection list -->
+    <string name="profile_empty_title">No connections yet</string>
+    <string name="profile_empty_desc">Add an address and credentials, then open the service page in one tap</string>
+    <string name="profile_last_launched">Last opened</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_back">Back</string>
+    <string name="action_close">Close</string>
+    <string name="action_retry">Retry</string>
+    <string name="action_show_password">Show</string>
+    <string name="action_hide_password">Hide</string>
 
-    <!-- 组编辑 -->
-    <string name="title_new_profile">新建连接组</string>
-    <string name="title_edit_profile">编辑连接组</string>
-    <string name="section_basic_info">基本信息</string>
-    <string name="label_base_url">服务地址</string>
+    <!-- Connection editor -->
+    <string name="title_new_profile">New connection</string>
+    <string name="title_edit_profile">Edit connection</string>
+    <string name="section_basic_info">Basic information</string>
+    <string name="label_base_url">Service address</string>
     <string name="hint_base_url">https://dsh.example.com:8443</string>
-    <string name="label_profile_name">名称</string>
-    <string name="hint_profile_name">留空则自动使用主机名</string>
-    <string name="label_username">账号</string>
-    <string name="label_password">密码</string>
-    <string name="error_base_url_required">请填写服务地址</string>
-    <string name="error_base_url_invalid">地址无法解析，请检查是否包含 http(s):// 与主机名</string>
-    <string name="error_username_required">请填写账号</string>
-    <string name="error_password_required">请填写密码</string>
-    <string name="dialog_delete_title">删除连接组</string>
-    <string name="dialog_delete_message">确定删除「%1$s」？该组的地址与凭据将从本机移除。</string>
+    <string name="label_profile_name">Name</string>
+    <string name="hint_profile_name">Leave blank to use the host name</string>
+    <string name="label_username">Username</string>
+    <string name="label_password">Password</string>
+    <string name="error_base_url_required">Enter the service address</string>
+    <string name="error_base_url_invalid">Cannot parse this address. Check that it includes http(s):// and a host name</string>
+    <string name="error_username_required">Enter the username</string>
+    <string name="error_password_required">Enter the password</string>
+    <string name="dialog_delete_title">Delete connection</string>
+    <string name="dialog_delete_message">Delete “%1$s”? Its address and credentials will be removed from this device.</string>
 
-    <!-- 设置 -->
-    <string name="title_settings">设置</string>
-    <string name="cd_settings">设置</string>
-    <string name="setting_credentials_title">使用账号密码</string>
-    <string name="setting_credentials_desc">DeepSeek Harness 本身没有登录模块；仅当服务由 1Panel 等反向代理加了 Basic 鉴权时才需要开启。关闭后直接进入，已填写的凭据会被忽略。</string>
-    <string name="setting_adaptive_title">响应式兼容</string>
-    <string name="setting_adaptive_desc">注入针对 DeepSeek Harness 0.2.0-rc.2 的手机端响应式适配。Harness 更新后如出现显示异常，可关闭此项，仅保留基本页面显示。</string>
-    <string name="setting_credentials_disabled_hint">账号密码已在设置中关闭，连接时不会使用</string>
+    <!-- Settings -->
+    <string name="title_settings">Settings</string>
+    <string name="cd_settings">Settings</string>
+    <string name="setting_credentials_title">Use username and password</string>
+    <string name="setting_credentials_desc">DeepSeek Harness has no login of its own; turn this on only when the service sits behind Basic auth such as a 1Panel reverse proxy. When off, the app opens the service directly and saved credentials are ignored.</string>
+    <string name="setting_adaptive_title">Responsive compatibility</string>
+    <string name="setting_adaptive_desc">Injects a mobile responsive adaptation for DeepSeek Harness 0.2.0-rc.2. If pages look broken after a Harness update, turn this off to keep the basic page layout.</string>
+    <string name="setting_credentials_disabled_hint">Username and password are turned off in Settings and will not be used</string>
 
-    <!-- 语言：语言名按自身语言书写，不随界面语言变化，也不参与翻译 -->
-    <string name="title_language">语言</string>
-    <string name="setting_language_title">语言</string>
-    <string name="language_system">跟随系统</string>
+    <!-- Language: each language is written in its own language, so these two names stay untranslated -->
+    <string name="title_language">Language</string>
+    <string name="setting_language_title">Language</string>
+    <!-- %1$s：设备语言，例如 "System default (English)" -->
+    <string name="language_system_with">System default (%1$s)</string>
+    <!-- 设备语言未知时的「跟随系统」 -->
+    <string name="language_system">System default</string>
     <string name="language_chinese" translatable="false">简体中文</string>
     <string name="language_english" translatable="false">English</string>
 
-    <!-- 用户协议 -->
-    <string name="title_user_agreement">用户协议</string>
-    <string name="setting_agreement_title">用户协议</string>
-    <string name="setting_agreement_desc">查看服务说明、凭据与隐私的处理方式以及使用条款</string>
-    <string name="agreement_intro">DSHA 是运行在你手机本地的 DeepSeek Harness 入口。使用前请阅读以下条款，同意即表示你已理解并接受全部内容。</string>
-    <string name="agreement_section_service_title">一、服务说明</string>
-    <string name="agreement_section_service_body">本应用只提供浏览器外壳：服务地址与凭据由你自己填写，应用在本机打开对应网页。应用不提供、不托管、不运营任何服务端内容，能否访问取决于你自己的部署环境与网络状况。</string>
-    <string name="agreement_section_credentials_title">二、账号与凭据</string>
-    <string name="agreement_section_credentials_body">你填写的服务地址、账号与密码仅保存在本机应用的私有存储中，不会上传到任何服务器。应用不校验凭据的真实性，也不负责你的服务端安全配置；请勿在不受信任的设备上保存凭据，并自行妥善保管。</string>
-    <string name="agreement_section_privacy_title">三、隐私与数据</string>
-    <string name="agreement_section_privacy_body">应用不收集、不上报设备信息、使用记录与页面内容，也不含统计与广告组件。你在网页中产生的数据由所连接的服务端处理，适用该服务自身的隐私规则。</string>
-    <string name="agreement_section_liability_title">四、免责声明</string>
-    <string name="agreement_section_liability_body">应用按「现状」提供，不对可用性、稳定性与适配效果作出任何担保。因服务端升级、网络异常或页面结构变化导致的功能失效与数据问题，应用不承担责任。请勿将本应用用于任何违法用途。</string>
-    <string name="agreement_section_change_title">五、协议更新</string>
-    <string name="agreement_section_change_body">本协议可能随版本更新调整，更新后的条款随应用一同发布，继续使用即视为接受；若你不同意，请停止使用并卸载本应用。</string>
-    <string name="agreement_onboarding_desc">请阅读并同意以下条款，之后才能继续完成设置并使用本应用。</string>
-    <string name="agreement_accept_checkbox">我已阅读并同意《用户协议》</string>
-    <string name="agreement_accept">同意并继续</string>
+    <!-- User agreement -->
+    <string name="title_user_agreement">User agreement</string>
+    <string name="setting_agreement_title">User agreement</string>
+    <string name="setting_agreement_desc">Read the service description, how credentials and privacy are handled, and the terms of use</string>
+    <string name="agreement_intro">DSHA is a DeepSeek Harness entry point that runs locally on your phone. Please read the terms below; by accepting you confirm that you understand and accept all of them.</string>
+    <string name="agreement_section_service_title">1. What this app does</string>
+    <string name="agreement_section_service_body">This app is only a browser shell: you enter the service address and credentials yourself, and the app opens the matching web page on this device. The app does not provide, host or operate any server-side content; whether the service can be reached depends on your own deployment and network.</string>
+    <string name="agreement_section_credentials_title">2. Accounts and credentials</string>
+    <string name="agreement_section_credentials_body">The service address, username and password you enter are stored only in the private storage of this app on this device and are never uploaded to any server. The app does not verify credentials and is not responsible for the security configuration of your server; do not save credentials on an untrusted device and keep them safe yourself.</string>
+    <string name="agreement_section_privacy_title">3. Privacy and data</string>
+    <string name="agreement_section_privacy_body">The app does not collect or report device information, usage records or page content, and it contains no analytics or advertising components. Data you create in the web page is handled by the service you connect to and follows the privacy rules of that service.</string>
+    <string name="agreement_section_liability_title">4. Disclaimer</string>
+    <string name="agreement_section_liability_body">The app is provided “as is”, with no warranty of availability, stability or adaptation quality. The app is not liable for failures or data problems caused by server upgrades, network issues or page structure changes. Do not use this app for any unlawful purpose.</string>
+    <string name="agreement_section_change_title">5. Changes to these terms</string>
+    <string name="agreement_section_change_body">These terms may be adjusted as the app is updated; updated terms ship together with the app and continued use means acceptance. If you do not agree, stop using the app and uninstall it.</string>
+    <string name="agreement_onboarding_desc">Read and accept the terms below before you can finish the setup and use this app.</string>
+    <string name="agreement_accept_checkbox">I have read and accept the User agreement</string>
+    <string name="agreement_accept">Accept and continue</string>
 
-    <!-- 快捷设置（首次启动，三页：用户协议、账号密码、响应式兼容） -->
-    <string name="onboarding_title">先进行几个设置吧</string>
-    <string name="onboarding_next">下一步</string>
-    <string name="onboarding_prev">上一步</string>
-    <string name="onboarding_confirm">完成</string>
+    <!-- Quick setup (first launch, four pages: language, user agreement, credentials, responsive compatibility) -->
+    <string name="onboarding_title">A couple of quick settings</string>
+    <string name="onboarding_language_desc">Choose the language used by the interface. The interface updates right away, and you can change it later in Settings.</string>
+    <string name="onboarding_next">Next</string>
+    <string name="onboarding_prev">Previous</string>
+    <string name="onboarding_confirm">Done</string>
 
-    <!-- 网页壳 -->
-    <string name="web_starting">启动中</string>
-    <string name="web_starting_harness">正在启动Harness</string>
-    <string name="web_ready_soon">即将准备就绪</string>
-    <string name="web_loading_failed">页面加载失败</string>
-    <string name="web_loading_failed_desc">请检查网络连接与服务地址后重试</string>
-    <string name="web_autofill_fallback">已尝试自动填充，若仍停留在登录页请手动输入</string>
-    <string name="web_auth_failed">站点鉴权未通过，请检查连接组里的账号与密码</string>
-    <string name="web_auth_failed_desc">返回组列表，编辑该连接组的账号与密码后重试</string>
-    <string name="web_no_browser">未找到可处理该链接的应用</string>
-    <string name="web_download_started">已开始下载</string>
-    <string name="web_download_failed">下载失败</string>
-    <string name="web_profile_missing">连接组不存在，请返回重新选择</string>
-    <string name="web_close_confirm_message">关闭后返回连接组列表，可随时重新连接。</string>
+    <!-- Web shell -->
+    <string name="web_starting">Starting</string>
+    <string name="web_starting_harness">Starting Harness</string>
+    <string name="web_ready_soon">Almost ready</string>
+    <string name="web_loading_failed">Could not load the page</string>
+    <string name="web_loading_failed_desc">Check the network connection and the service address, then retry</string>
+    <string name="web_autofill_fallback">Autofill was attempted; if the sign-in page is still shown, enter it manually</string>
+    <string name="web_auth_failed">Site authentication failed. Check the username and password of this connection</string>
+    <string name="web_auth_failed_desc">Go back to the list, edit the username and password of this connection, then retry</string>
+    <string name="web_no_browser">No app can open this link</string>
+    <string name="web_download_started">Download started</string>
+    <string name="web_download_failed">Download failed</string>
+    <string name="web_profile_missing">This connection no longer exists. Go back and choose again</string>
+    <string name="web_close_confirm_message">Closing returns to the connection list; you can reconnect at any time.</string>
 
-    <!-- 无障碍 -->
-    <string name="cd_new_profile">新建连接组</string>
-    <string name="cd_connect">连接</string>
-    <string name="cd_more_actions">更多操作</string>
-    <string name="cd_back">返回</string>
-    <string name="cd_refresh">刷新</string>
+    <!-- Accessibility -->
+    <string name="cd_new_profile">New connection</string>
+    <string name="cd_connect">Connect</string>
+    <string name="cd_more_actions">More actions</string>
+    <string name="cd_back">Back</string>
+    <string name="cd_refresh">Refresh</string>
 </resources>

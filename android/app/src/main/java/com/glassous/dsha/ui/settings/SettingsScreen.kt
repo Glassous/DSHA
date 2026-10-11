@@ -64,6 +64,8 @@ fun SettingsScreen(onBack: () -> Unit) {
     // 这里以 Configuration 为 key，万一将来改为自行处理配置变化也能重新读到最新选择
     val configuration = LocalConfiguration.current
     val appLanguage = remember(configuration) { context.currentAppLanguage() }
+    // 设备语言：跟随系统时就是当前设备语言，已切成别的语言时用之前记下的那份
+    val deviceLanguage = remember(configuration) { context.deviceLanguageCode() }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -119,7 +121,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             )
             LinkSettingCard(
                 title = stringResource(R.string.setting_language_title),
-                description = stringResource(appLanguage.labelRes),
+                description = appLanguage.optionName(deviceLanguage),
                 onClick = { languagePickerVisible = true },
             )
             LinkSettingCard(
