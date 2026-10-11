@@ -60,6 +60,22 @@ class ProfileEditViewModel(
     /** 本组的网页适配：适配所依据的 Harness 版本。 */
     var harnessVersion by mutableStateOf(HarnessVersion.latest)
 
+    /** 本组记住的访问认证密码（插件 `@fonlan/dsh-web-auth`）；空串表示没记住过。 */
+    var webAuthPassword by mutableStateOf("")
+    var webAuthPasswordVisible by mutableStateOf(false)
+
+    /** 本组的访问认证：遇到插件登录页时是否静默自动登录。 */
+    var webAuthAutoLogin by mutableStateOf(false)
+
+    /**
+     * 打开本页时是否已经记住过访问认证密码：决定访问认证那一段是否出现。
+     *
+     * 可见性不能直接绑在 [webAuthPassword] 的当前值上——否则用户在输入框里一清空文本，
+     * 整段（连同自动登录开关）会当场消失。以进入页面时的状态为准，保存后再打开才按新状态决定。
+     */
+    var webAuthRemembered by mutableStateOf(false)
+        private set
+
     var baseUrlError by mutableStateOf<Int?>(null)
         private set
     var usernameError by mutableStateOf<Int?>(null)
@@ -118,6 +134,9 @@ class ProfileEditViewModel(
         lastUsedAt = lastUsedAt,
         adaptiveCompatEnabled = adaptiveCompatEnabled,
         harnessVersion = harnessVersion,
+        webAuthPassword = webAuthPassword,
+        // 密码被清空时自动登录没有意义，一并关掉：下次打开该连接会重新弹窗询问
+        webAuthAutoLogin = webAuthPassword.isNotEmpty() && webAuthAutoLogin,
     )
 
     private fun apply(profile: Profile) {
@@ -129,5 +148,8 @@ class ProfileEditViewModel(
         lastUsedAt = profile.lastUsedAt
         adaptiveCompatEnabled = profile.adaptiveCompatEnabled
         harnessVersion = profile.harnessVersion
+        webAuthPassword = profile.webAuthPassword
+        webAuthAutoLogin = profile.webAuthAutoLogin
+        webAuthRemembered = profile.webAuthPassword.isNotEmpty()
     }
 }

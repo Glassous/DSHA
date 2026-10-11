@@ -42,6 +42,13 @@
     <string name="setting_credentials_title">Use username and password</string>
     <string name="setting_credentials_desc">DeepSeek Harness has no login of its own; turn this on only when this connection sits behind Basic auth such as a 1Panel reverse proxy. When off, the connection opens directly and saved credentials are ignored.</string>
 
+    <!-- Web access authentication (per connection, set in the editor) -->
+    <string name="section_web_auth">Access authentication</string>
+    <string name="label_web_auth_password">Access password</string>
+    <string name="setting_web_auth_password_desc">Remembered on this device after signing in through the service’s own sign-in page. Clear it and the password dialog comes back next time.</string>
+    <string name="setting_web_auth_auto_login_title">Sign in automatically</string>
+    <string name="setting_web_auth_auto_login_desc">When this service asks for its access password, sign in with the remembered password silently instead of showing the password dialog.</string>
+
     <!-- Settings -->
     <string name="title_settings">Settings</string>
     <string name="cd_settings">Settings</string>
@@ -118,6 +125,18 @@
     <string name="web_autofill_fallback">Autofill was attempted; if the sign-in page is still shown, enter it manually</string>
     <string name="web_auth_failed">Site authentication failed. Check the username and password of this connection</string>
     <string name="web_auth_failed_desc">Go back to the list, edit the username and password of this connection, then retry</string>
+    <string name="web_auto_logging_in">Signing in automatically</string>
+
+    <!-- Web access authentication (the plugin’s sign-in page is taken over by a local dialog) -->
+    <string name="web_auth_login_title">Access authentication</string>
+    <string name="web_auth_login_message">This service requires a password. Enter the access password.</string>
+    <string name="web_auth_setup_title">Set the access password</string>
+    <string name="web_auth_setup_message">This service is using access authentication for the first time. Set a password of at least 8 characters; it will be asked for from now on.</string>
+    <string name="label_web_auth_password_confirm">Confirm password</string>
+    <string name="action_web_auth_login">Sign in</string>
+    <string name="action_web_auth_setup">Set password and continue</string>
+    <string name="error_web_auth_password_too_short">Use at least 8 characters</string>
+    <string name="error_web_auth_password_mismatch">The two passwords do not match</string>
     <string name="web_no_browser">No app can open this link</string>
     <string name="web_download_started">Download started</string>
     <string name="web_download_failed">Download failed</string>

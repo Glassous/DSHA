@@ -75,6 +75,10 @@ enum class WebEvent {
  * @param harnessVersion 版本层适配所依据的 Harness 版本，取自连接组自身
  * @param safeTopDp 状态栏高度（dp）：作为顶部安全距离注入网页内部，顶栏图案才能伸到状态栏底下
  * @param safeBottomDp 导航栏高度（dp）：注入网页内部的底部安全距离；软键盘弹出时传 0（那时视图已被抬起）
+ * @param onNavigationStarted 每次主框架导航开始时回调：访问认证流程中据此复位启动加载序列，
+ *   让登录成功后的新页面重新完整走一遍「加载 → 就绪提示 → 撤除」
+ * @param onWebAuthPage 每次整页加载完成后回调访问认证页的检测结果；
+ *   null 表示当前页面不是该插件的登录页（也用于「已经离开登录页」的判定）
  */
 @Composable
 fun DshaWebView(
@@ -88,7 +92,9 @@ fun DshaWebView(
     onWebViewCreated: (WebView) -> Unit = {},
     onProgress: (Int) -> Unit = {},
     onCanGoBackChanged: (Boolean) -> Unit = {},
+    onNavigationStarted: () -> Unit = {},
     onLoadError: (Boolean) -> Unit = {},
+    onWebAuthPage: (WebAuthPage?) -> Unit = {},
     onBackgroundColor: (Color) -> Unit = {},
     onEvent: (WebEvent) -> Unit = {},
 ) {
@@ -97,7 +103,9 @@ fun DshaWebView(
     val pendingFileCallback = remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
     val onProgressState = rememberUpdatedState(onProgress)
     val onCanGoBackState = rememberUpdatedState(onCanGoBackChanged)
+    val onNavigationStartedState = rememberUpdatedState(onNavigationStarted)
     val onLoadErrorState = rememberUpdatedState(onLoadError)
+    val onWebAuthPageState = rememberUpdatedState(onWebAuthPage)
     val onEventState = rememberUpdatedState(onEvent)
     val onCreatedState = rememberUpdatedState(onWebViewCreated)
     val onBackgroundColorState = rememberUpdatedState(onBackgroundColor)
@@ -140,7 +148,9 @@ fun DshaWebView(
                 adaptiveCompatEnabled = { adaptiveCompatEnabledState.value },
                 harnessVersion = { harnessVersionState.value },
                 onCanGoBack = { value -> onCanGoBackState.value(value) },
+                onNavigationStarted = { onNavigationStartedState.value() },
                 onLoadError = { failed -> onLoadErrorState.value(failed) },
+                onWebAuthPage = { page -> onWebAuthPageState.value(page) },
                 onBackgroundColor = { color -> onBackgroundColorState.value(color) },
                 onEvent = { event -> onEventState.value(event) },
             )
@@ -272,7 +282,9 @@ private fun buildWebViewClient(
     adaptiveCompatEnabled: () -> Boolean,
     harnessVersion: () -> HarnessVersion,
     onCanGoBack: (Boolean) -> Unit,
+    onNavigationStarted: () -> Unit,
     onLoadError: (Boolean) -> Unit,
+    onWebAuthPage: (WebAuthPage?) -> Unit,
     onBackgroundColor: (Color) -> Unit,
     onEvent: (WebEvent) -> Unit,
 ): WebViewClient = object : WebViewClient() {
@@ -316,10 +328,13 @@ private fun buildWebViewClient(
 
     override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
         onLoadError(false)
+        // 主框架开始新一次导航：访问认证流程要据此复位启动加载序列
+        onNavigationStarted()
     }
 
     override fun onPageFinished(view: WebView, url: String?) {
         onCanGoBack(view.canGoBack())
+        probeWebAuthPage(view, alive, onWebAuthPage)
         // 本组关闭凭据时不自动填充登录表单
         if (profile.credentialsEnabled) {
             scheduleAutoFill(view, profile, alive, attempt = 0, onFallback = { onEvent(WebEvent.AUTOFILL_FALLBACK) })
@@ -528,6 +543,24 @@ private fun launchExternally(context: Context, target: Uri, onEvent: (WebEvent) 
     }
 
 /**
+ * 检测当前页面是不是访问认证插件（`@fonlan/dsh-web-auth`）的登录页。
+ *
+ * 每次整页加载只查一次：插件页面是服务端渲染的，走到 onPageFinished 时 DOM 已经就绪，
+ * 不需要像 SPA 那样重试。回调 null 表示「这一页不是插件登录页」，界面层据此判定
+ * 已经离开登录页（登录成功后回到应用页就是这种情况）。
+ */
+private fun probeWebAuthPage(
+    webView: WebView,
+    alive: MutableState<Boolean>,
+    onResult: (WebAuthPage?) -> Unit,
+) {
+    webView.evaluateJavascript(WEB_AUTH_DETECT_SCRIPT) { raw ->
+        if (!alive.value) return@evaluateJavascript
+        onResult(parseWebAuthPage(raw))
+    }
+}
+
+/**
  * 在真实登录页里填充账号密码并提交。
  *
  * DeepSeek Harness 本体不提供账号密码登录，鉴权由第三方插件或反向代理提供，
@@ -584,6 +617,8 @@ private fun buildFillScript(profile: Profile): String {
         (function () {
           try {
             if (window.__dshaFilled === true) { return 'skip'; }
+            /* 访问认证插件的登录页由本地闸门接管，Basic 自动填充不参与，避免两边抢填同一个密码框 */
+            if ($WEB_AUTH_FILL_GUARD) { return 'skip'; }
             var pwd = document.querySelector('input[type=password]');
             if (!pwd) { return 'nopage'; }
             function setValue(el, value) {

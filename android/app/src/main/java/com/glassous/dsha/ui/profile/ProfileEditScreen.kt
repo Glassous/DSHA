@@ -136,6 +136,12 @@ fun ProfileEditScreen(
 
             CredentialsFields(viewModel)
 
+            // 只在「打开本页时已经记住过访问密码」的连接组上出现：
+            // 没用过访问认证插件的连接组，编辑页与以前完全一致
+            if (viewModel.webAuthRemembered) {
+                WebAuthFields(viewModel)
+            }
+
             WebAdaptFields(
                 viewModel = viewModel,
                 onPickVersion = { versionPickerVisible = true },
@@ -297,6 +303,73 @@ private fun CredentialsFields(viewModel: ProfileEditViewModel) {
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             shape = RoundedCornerShape(20.dp),
             modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/**
+ * 访问认证：已记住的访问密码与自动登录开关。
+ *
+ * 这段整体只在「已经记住过访问密码」时才渲染（见调用处），所以没用过访问认证插件的连接组
+ * 编辑页零变化。密码可以随时改或清空——清空并保存后，下次打开该连接会重新弹窗询问。
+ */
+@Composable
+private fun WebAuthFields(viewModel: ProfileEditViewModel) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.section_web_auth),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        OutlinedTextField(
+            value = viewModel.webAuthPassword,
+            onValueChange = { viewModel.webAuthPassword = it },
+            label = { Text(stringResource(R.string.label_web_auth_password)) },
+            supportingText = { Text(stringResource(R.string.setting_web_auth_password_desc)) },
+            singleLine = true,
+            leadingIcon = { Icon(painterResource(R.drawable.ic_lock), contentDescription = null) },
+            trailingIcon = {
+                IconButton(
+                    onClick = { viewModel.webAuthPasswordVisible = !viewModel.webAuthPasswordVisible },
+                ) {
+                    Icon(
+                        painter = painterResource(
+                            if (viewModel.webAuthPasswordVisible) {
+                                R.drawable.ic_visibility_off
+                            } else {
+                                R.drawable.ic_visibility
+                            },
+                        ),
+                        contentDescription = stringResource(
+                            if (viewModel.webAuthPasswordVisible) {
+                                R.string.action_hide_password
+                            } else {
+                                R.string.action_show_password
+                            },
+                        ),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            visualTransformation = if (viewModel.webAuthPasswordVisible) {
+                VisualTransformation.None
+            } else {
+                PasswordVisualTransformation()
+            },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            shape = RoundedCornerShape(20.dp),
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        SwitchSettingCard(
+            title = stringResource(R.string.setting_web_auth_auto_login_title),
+            description = stringResource(R.string.setting_web_auth_auto_login_desc),
+            checked = viewModel.webAuthAutoLogin,
+            onCheckedChange = { viewModel.webAuthAutoLogin = it },
         )
     }
 }

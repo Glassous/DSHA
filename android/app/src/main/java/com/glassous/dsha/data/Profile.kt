@@ -15,6 +15,9 @@ import java.util.UUID
  *   与之前一致的可读体验，需要时再单独关掉。关闭后只是不改组件，页面仍由基础注入层保证正常显示。
  * @param harnessVersion 适配所依据的 Harness 版本；默认取当前适配的最高版本，
  *   不同连接组可能连向不同版本的 Harness，因此版本随组存放而不是全局共用。
+ * @param webAuthPassword 该部署「访问认证」插件（@fonlan/dsh-web-auth）的访问密码，由应用在本地弹窗里
+ *   登录成功后记住；空串表示没记住过——此时编辑页不出现任何访问认证相关字段。与 [password] 一样明文存本机。
+ * @param webAuthAutoLogin 是否在遇到该插件登录页时静默自动登录；默认关闭，只有记住了密码的连接组才谈得上开启。
  */
 data class Profile(
     val id: String = newId(),
@@ -26,6 +29,8 @@ data class Profile(
     val lastUsedAt: Long = 0L,
     val adaptiveCompatEnabled: Boolean = true,
     val harnessVersion: HarnessVersion = HarnessVersion.latest,
+    val webAuthPassword: String = "",
+    val webAuthAutoLogin: Boolean = false,
 ) {
     /** 列表与工具栏上展示的名称：用户没填组名时退化为主机名。 */
     val displayName: String

@@ -145,9 +145,18 @@ fun WebScreen(
         when {
             // 还没有网页（加载中或缺组）时没有可关闭的服务页面，直接返回
             current == null -> onBack()
+            // 访问认证进行中（静默自动登录或已提交，此时没有弹窗）：返回等同于放弃本地接管，
+            // 撤掉遮挡露出网页登录页。弹窗自己的返回由 Dialog 先消费，走 onDismiss。
+            viewModel.webAuthGate != null -> viewModel.onWebAuthAbandoned()
             current.canGoBack() -> current.goBack()
             else -> closeConfirmVisible = true
         }
+    }
+
+    // 提交脚本没能生效（页面已被换掉、或填进去的值过不了页面自身校验）：
+    // 放弃本地接管，露出网页原生登录页，别让用户卡在覆盖层里
+    val onWebAuthSubmitResult: (Boolean) -> Unit = { submitted ->
+        if (!submitted) viewModel.onWebAuthAbandoned()
     }
 
     Scaffold(
@@ -200,7 +209,33 @@ fun WebScreen(
                         onWebViewCreated = { created -> webView = created },
                         onBackgroundColor = { color -> webBackground = color },
                         onProgress = { value -> viewModel.progress = value },
+                        // 闸门激活期间每次主框架导航都要复位加载序列：登录提交后跳回应用页时，
+                        // 启动动画得按新页面自己的进度重走一遍，露出时才是渲染完整的页面
+                        onNavigationStarted = { viewModel.onNavigationStarted() },
                         onLoadError = { failed -> viewModel.loadError = failed },
+                        onWebAuthPage = { page ->
+                            if (page == null) {
+                                // 已不是插件登录页：认证结束，闸门落下（是提交成功则顺手记住密码）
+                                viewModel.onWebAuthLeft()
+                            } else {
+                                val autoLoginPassword = viewModel.onWebAuthPageDetected(page)
+                                if (autoLoginPassword != null) {
+                                    // 静默自动登录：全程只显示「自动登录中」，不弹窗、不露出网页登录页
+                                    val target = webView
+                                    if (target == null) {
+                                        viewModel.onWebAuthAbandoned()
+                                    } else {
+                                        submitWebAuth(
+                                            webView = target,
+                                            password = autoLoginPassword,
+                                            // 登录态没有确认框，传同一份即可
+                                            confirm = autoLoginPassword,
+                                            onResult = onWebAuthSubmitResult,
+                                        )
+                                    }
+                                }
+                            }
+                        },
                         onEvent = { event ->
                             if (event == WebEvent.AUTH_FAILED) authFailed = true
                             messageRes = when (event) {
@@ -216,17 +251,22 @@ fun WebScreen(
                     // 阶段二：网页加载资源期间同样不露出 web，用启动动画整体盖住；
                     // 加载完成后再多停留 1.5 秒（"即将准备就绪"），随后原地快速淡出
                     AnimatedVisibility(
-                        visible = !viewModel.pageReady && !viewModel.loadError,
+                        // 访问认证闸门没落下就始终遮挡：插件登录页在认证结束前一律不许露出来
+                        visible = (viewModel.webAuthGate != null || !viewModel.pageReady) &&
+                            !viewModel.loadError,
                         // 进入无动画，撤除时只做 alpha 淡出：不位移、不缩放，网页从下方渐显
                         enter = EnterTransition.None,
                         exit = fadeOut(animationSpec = tween(LOADING_FADE_MS)),
                     ) {
                         StartupLoading(
                             text = stringResource(
-                                if (viewModel.loadFinished) {
-                                    R.string.web_ready_soon
-                                } else {
-                                    R.string.web_starting_harness
+                                when {
+                                    // 静默自动登录期间：文案跟着闸门状态走
+                                    viewModel.webAuthGate is WebAuthGate.AutoLoggingIn ->
+                                        R.string.web_auto_logging_in
+
+                                    viewModel.loadFinished -> R.string.web_ready_soon
+                                    else -> R.string.web_starting_harness
                                 },
                             ),
                             modifier = Modifier.fillMaxSize(),
@@ -268,6 +308,38 @@ fun WebScreen(
             },
             onDismiss = { closeConfirmVisible = false },
         )
+    }
+
+    // 访问认证：插件登录页由本地弹窗接管。静默自动登录时不弹窗，只剩覆盖层与「自动登录中」
+    val webAuthGate = viewModel.webAuthGate
+    if (webAuthGate is WebAuthGate.Prompt) {
+        // 失败重弹时优先保留用户刚输入的内容，其次才是连接组里已记住的密码
+        val prefill = viewModel.webAuthLastInput.ifEmpty { profile?.webAuthPassword.orEmpty() }
+        val submit: (String) -> Unit = { password ->
+            val target = webView
+            if (target == null) {
+                viewModel.onWebAuthAbandoned()
+            } else {
+                viewModel.onWebAuthSubmitted(password)
+                submitWebAuth(target, password, password, onWebAuthSubmitResult)
+            }
+        }
+        if (webAuthGate.setup) {
+            WebAuthSetupDialog(
+                initialPassword = prefill,
+                serverError = webAuthGate.errorText,
+                onConfirm = submit,
+                // 取消＝放弃本地接管：撤掉遮挡，露出网页原生的登录页让用户自己操作
+                onDismiss = { viewModel.onWebAuthAbandoned() },
+            )
+        } else {
+            WebAuthLoginDialog(
+                initialPassword = prefill,
+                serverError = webAuthGate.errorText,
+                onConfirm = submit,
+                onDismiss = { viewModel.onWebAuthAbandoned() },
+            )
+        }
     }
 }
 

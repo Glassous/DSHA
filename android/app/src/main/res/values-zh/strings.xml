@@ -38,6 +38,13 @@
     <string name="setting_credentials_title">使用账号密码</string>
     <string name="setting_credentials_desc">DeepSeek Harness 本身没有登录模块；仅当本连接的服务由 1Panel 等反向代理加了 Basic 鉴权时才需要开启。关闭后直接进入，已填写的凭据会被忽略。</string>
 
+    <!-- 访问认证（按连接组，在编辑页设置） -->
+    <string name="section_web_auth">访问认证</string>
+    <string name="label_web_auth_password">访问密码</string>
+    <string name="setting_web_auth_password_desc">在服务自带的登录页登录成功后记住在本机；清空后下次打开会重新询问。</string>
+    <string name="setting_web_auth_auto_login_title">自动登录</string>
+    <string name="setting_web_auth_auto_login_desc">该服务要求输入访问密码时，用已记住的密码静默登录，不再弹出密码弹窗。</string>
+
     <!-- 设置 -->
     <string name="title_settings">设置</string>
     <string name="cd_settings">设置</string>
@@ -112,6 +119,18 @@
     <string name="web_autofill_fallback">已尝试自动填充，若仍停留在登录页请手动输入</string>
     <string name="web_auth_failed">站点鉴权未通过，请检查连接组里的账号与密码</string>
     <string name="web_auth_failed_desc">返回组列表，编辑该连接组的账号与密码后重试</string>
+    <string name="web_auto_logging_in">自动登录中</string>
+
+    <!-- 访问认证（插件的登录页由本地弹窗接管） -->
+    <string name="web_auth_login_title">访问认证</string>
+    <string name="web_auth_login_message">此服务需要密码访问，请输入访问密码。</string>
+    <string name="web_auth_setup_title">设置访问密码</string>
+    <string name="web_auth_setup_message">该服务首次使用访问认证：请设置一个至少 8 位的密码，此后访问本服务需要输入该密码。</string>
+    <string name="label_web_auth_password_confirm">确认密码</string>
+    <string name="action_web_auth_login">登录</string>
+    <string name="action_web_auth_setup">设置密码并进入</string>
+    <string name="error_web_auth_password_too_short">密码至少需要 8 位</string>
+    <string name="error_web_auth_password_mismatch">两次输入的密码不一致</string>
     <string name="web_no_browser">未找到可处理该链接的应用</string>
     <string name="web_download_started">已开始下载</string>
     <string name="web_download_failed">下载失败</string>
