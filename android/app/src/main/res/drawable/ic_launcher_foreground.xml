@@ -1,3 +1,8 @@
+<!--
+  启动图标前景：海豚图案。group 轴心 (11.4755, 8.5005) 即图案原始包围盒中心，
+  放大 2.3 倍后图案约 53.8 x 39.2dp、居中于 (54, 54)，占据画布宽度的约 50%，
+  且仍在自适应图标 66dp 安全圆内（安全上限约 2.45 倍）。
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -6,8 +11,8 @@
     <group
         android:pivotX="11.4755"
         android:pivotY="8.5005"
-        android:scaleX="1.62"
-        android:scaleY="1.62"
+        android:scaleX="2.3"
+        android:scaleY="2.3"
         android:translateX="42.5245"
         android:translateY="45.4995">
         <path
