@@ -7,18 +7,30 @@ import com.glassous.dsha.ui.web.adapt.VersionAdapt
  * 不碰构建哈希前缀（`pI_x6G_` / `VOzbGW_` 会随构建变化）。
  */
 private val V020RC2_CSS = """
-/* 抽屉遮罩：位于抽屉之下、内容之上。
-   起点在顶栏下沿：顶栏按钮不会被盖住，也就不必给顶栏加定位层级——
-   顶栏一旦成为定位元素，锚在它内部的绝对定位浮层会跟着改定位基准。 */
+/* 抽屉/右栏遮罩：位于抽屉与右栏面板之下、主内容之上。
+   整屏铺满——顶栏那一条也要一起变暗，否则展开侧栏后顶栏会与被压暗的主区域割裂。
+   但遮罩本身不接收触摸，真正"点空白处收起"的是它下面那层子层：子层从顶栏下沿开始，
+   顶栏区域留空，顶栏按钮（如"打开右侧边栏"）在抽屉展开时仍可点，
+   也不会因为顶栏变暗反而点不动。 */
 #__DSHA_SCRIM_ID__ {
   position: fixed;
-  top: var(--dsha-scrim-top, calc(__DSHA_SAFE_TOP__px + 76px));
+  top: 0;
   right: 0;
   bottom: 0;
   left: 0;
   z-index: 35;
   display: none;
   background: rgba(0, 0, 0, .28);
+  pointer-events: none;
+}
+#__DSHA_SCRIM_ID__::before {
+  content: "";
+  position: absolute;
+  top: var(--dsha-scrim-top, calc(__DSHA_SAFE_TOP__px + 76px));
+  right: 0;
+  bottom: 0;
+  left: 0;
+  pointer-events: auto;
 }
 
 /* 呼出侧栏按钮：注入在顶栏标题左侧（`conversation.header.leading`），
@@ -48,7 +60,7 @@ private val V020RC2_CSS = """
 
 /* ===== 手机端（视口 < 600 CSS px，平板不命中） ===== */
 @media (max-width: __DSHA_MOBILE_LIMIT__px) {
-  /* 1. 外壳：三栏改单栏，左右栏降级为覆盖式抽屉 */
+  /* 1. 外壳：三栏改单栏；左栏降级为覆盖式抽屉，右栏交给应用自己的整屏面板（见下） */
   [class$=_frame] {
     grid-template-columns: 0px minmax(0px, 1fr) 0px !important;
   }
@@ -58,8 +70,8 @@ private val V020RC2_CSS = """
     border-left: none !important;
     border-right: none !important;
   }
-  [class$=_sidebarCol],
-  [class$=_rightbarCol] {
+  /* 抽屉本体不带投影：与主区域的分界交给上面那层灰色遮罩，投影会在大屏上显得浑浊 */
+  [class$=_sidebarCol] {
     position: fixed !important;
     top: 0 !important;
     bottom: 0 !important;
@@ -68,26 +80,49 @@ private val V020RC2_CSS = """
     max-width: 84vw !important;
     box-sizing: border-box !important;
     padding-top: calc(__DSHA_SAFE_TOP__px + 4px) !important;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, .4) !important;
     transition: transform .22s cubic-bezier(.2, 0, 0, 1) !important;
     will-change: transform;
     /* 收起态不吃触摸事件：容器滑出屏幕后，任何残留区域都可能拦住顶栏按钮 */
     pointer-events: none !important;
   }
-  /* 内层面板按容器宽度铺满：右栏 panel 带内联 width（桌面值，可达 768px），
-     会让内容按错误宽度排版并溢出容器，必须压回 100%。 */
-  [class$=_sidebarCol] > [class$=_root],
-  [class$=_rightbarCol] [class$=_panel] {
+  /* 右栏不做成侧栏那样的抽屉：应用自己就把 panel 做成绝对定位、贴右、整屏宽的浮层
+     （窄屏下即"覆盖整个屏幕"，开合标记 data-sidebar-right-open 也打在 panel 上）。
+     这里只给 panel 一个确定的位置基准：贴右的 0 宽容器 —— panel 从它的右沿向左铺开，
+     正好覆盖整屏；容器不参与栅格布局，也就不会被 frame 的裁剪或自动排版影响。
+     收起时不吃触摸：应用把内容藏成 visibility:hidden，这里再兜一层。 */
+  [class$=_rightbarCol] {
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    right: 0 !important;
+    left: auto !important;
+    width: 0 !important;
+    z-index: 40 !important;
+    overflow: visible !important;
+    pointer-events: none !important;
+  }
+  html.dsha-rightbar-open [class$=_rightbarCol] {
+    pointer-events: auto !important;
+  }
+  /* 侧栏内层面板按容器宽度铺满：它带内联 width（桌面值 280px），窄容器下会溢出。 */
+  [class$=_sidebarCol] > [class$=_root] {
     width: 100% !important;
     min-width: 0 !important;
     max-width: none !important;
   }
-  /* 右栏 panel 是 absolute 定位，容器的 padding-top 推不动它，状态栏安全距离单独补。
-     溢出裁剪只加在 panel 上：侧栏容器若裁切，工作区行的按钮会被切掉一角。 */
+  /* 右栏 panel 自带内联 width（桌面值可达 768px）：只压上限到 100vw，宽度仍由应用决定；
+     panel 是 absolute 定位，容器的 padding 推不动它，上下安全距离单独补。
+     沉浸：面板打开时把画布底色铺到状态栏/手势条那两条上，内容再靠 padding 让开——
+     否则那两条会透出后面滚动的会话内容，看着像没铺满。
+     底色只在打开时画：面板节点收起时也在 DOM 里且同样是整屏框，一直着色会盖住主内容。 */
   [class$=_rightbarCol] [class$=_panel] {
-    padding-top: calc(__DSHA_SAFE_TOP__px + 4px) !important;
+    max-width: 100vw !important;
     box-sizing: border-box !important;
-    overflow: hidden !important;
+    padding-top: calc(__DSHA_SAFE_TOP__px + 4px) !important;
+    padding-bottom: calc(__DSHA_SAFE_BOTTOM__px + 4px) !important;
+  }
+  [class$=_rightbarCol] [class$=_panel][data-sidebar-right-open] {
+    background-color: var(--dsw-alias-bg-base, #fff) !important;
   }
   html.dsha-drawer-open #__DSHA_NAV_ID__,
   html.dsha-rightbar-open #__DSHA_NAV_ID__ {
@@ -99,13 +134,7 @@ private val V020RC2_CSS = """
     right: auto !important;
     transform: translateX(-101%);
   }
-  [class$=_rightbarCol] {
-    right: 0 !important;
-    left: auto !important;
-    transform: translateX(101%);
-  }
-  html.dsha-drawer-open [class$=_sidebarCol],
-  html.dsha-rightbar-open [class$=_rightbarCol] {
+  html.dsha-drawer-open [class$=_sidebarCol] {
     transform: none;
     pointer-events: auto !important;
   }
@@ -321,19 +350,39 @@ private val V020RC2_JS = """
     function cls(kind) {
       return kind === "sidebar" ? "dsha-drawer-open" : "dsha-rightbar-open";
     }
-    function isOpen(kind) {
-      return isMobile() && !!frame && !frame.hasAttribute(attr(kind));
+    /* 右栏的「开」由应用写在 panel 自身的 data-sidebar-right-open 上，而不是 frame 的
+       data-rightbar-collapsed：窄屏下它是整屏浮层，栅格列不需要变宽，
+       frame 的折叠标记可以一直是 true。两个标记取或，任一成立即视为展开。 */
+    function rightbarOpen() {
+      var panel = document.querySelector("[data-sidebar-right-open]") ||
+        document.querySelector("[class$=_rightbarCol] [class$=_panel]");
+      if (panel && panel.hasAttribute("data-sidebar-right-open")) { return true; }
+      return !!frame && !frame.hasAttribute(attr("rightbar"));
     }
-    /* 应用自己的抽屉开合按钮：侧栏内有 [class$=_toggle]；右栏开关在顶栏、不在侧栏容器内，
-       必须全文档找。判定顺序：容器内 [class$=_toggle] → aria-label 含「侧边栏/侧栏」
-       （用「右」字区分左右）→ 顶栏内含「右」的按钮 → 容器内尺寸启发式。找到后缓存。 */
+    function isOpen(kind) {
+      if (!isMobile()) { return false; }
+      if (kind === "rightbar") { return rightbarOpen(); }
+      return !!frame && !frame.hasAttribute(attr(kind));
+    }
+    /* 应用自己的抽屉开合按钮：侧栏内有 [class$=_toggle]；右栏开关在会话顶栏、不在侧栏容器内，
+       必须全文档找。判定顺序：右栏按状态取 data 标记 → 容器内 [class$=_toggle] →
+       aria-label 含「侧边栏/侧栏」（用「右」字区分左右）→ 顶栏内含「右」的按钮 →
+       容器内尺寸启发式。侧栏按钮找到后缓存（始终同一个），右栏两个按钮会互换，不缓存。 */
     function findToggle(kind) {
-      var cached = toggles[kind];
-      if (cached && cached.isConnected) { return cached; }
       var wrap = col(kind);
       var wantRight = kind === "rightbar";
       var btn = null;
       var i;
+      /* 应用给右栏开关打了稳定标记：展开按钮 data-sidebar-right-expand（会话顶栏），
+         收起按钮 data-sidebar-right-toggle（面板内）。两者同时在 DOM 里，按当前开合状态取。 */
+      if (wantRight) {
+        btn = document.querySelector(isOpen("rightbar")
+          ? "[data-sidebar-right-toggle]"
+          : "[data-sidebar-right-expand]");
+        if (btn) { return btn; }
+      }
+      var cached = toggles[kind];
+      if (cached && cached.isConnected) { return cached; }
       if (wrap) { btn = wrap.querySelector("[class$=_toggle]"); }
       if (!btn) {
         var all = document.querySelectorAll("button[aria-label]");
@@ -686,6 +735,12 @@ private val V020RC2_JS = """
             if (state.fresh.length > 80) { state.fresh.splice(0, state.fresh.length - 80); }
             schedule();
           }).observe(document.body, { childList: true, subtree: true });
+          /* 右栏的开合标记打在 panel 上，且 panel 可能晚于首屏才挂上：
+             整个 body 按属性变化监听，只过滤这几个标记，触发频率很低。 */
+          new MutationObserver(schedule).observe(document.body, {
+            attributes: true,
+            attributeFilter: ["data-sidebar-right-open", "data-rightbar-collapsed"]
+          });
         }
       }
       window.addEventListener("resize", schedule);
@@ -716,7 +771,8 @@ private val V020RC2_JS = """
  * `grid-template-columns: 280px minmax(0px,1fr) minmax(0px,0px)`，没有任何媒体查询，
  * 因此手机宽度下会话区被挤到 110px 左右。这里的做法是不改网页源码，只注入 CSS/JS：
  *
- * 1. 手机（视口 < 600 CSS px，等价 Android sw600dp 平板分界）下把三栏改成单栏 + 覆盖式抽屉；
+ * 1. 手机（视口 < 600 CSS px，等价 Android sw600dp 平板分界）下把三栏改成单栏：
+ *    左侧栏降级为覆盖式抽屉，右侧栏沿用应用自己的整屏面板（只补安全区、给一个定位基准）；
  * 2. 手机下把设置弹窗左侧的标签导航搬到顶部，图标在上、文字在下。
  *
  * 外壳级的安全区与视口塌陷兜底不在这里，见 `adapt/BaseAdapt.kt`：那些与版本无关，
