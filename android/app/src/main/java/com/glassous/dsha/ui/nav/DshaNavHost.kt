@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +14,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
@@ -58,6 +62,17 @@ object DshaRoutes {
 /** 覆盖式转场时长：进入与退出用同一节奏，观感统一。 */
 private const val TRANSITION_DURATION_MS = 300
 
+/** 快捷设置弹窗打开时的背景虚化半径，以及虚化进出的过渡时长。 */
+private val ONBOARDING_BLUR_RADIUS = 20.dp
+private const val ONBOARDING_BLUR_DURATION_MS = 250
+
+/**
+ * 背景虚化：半径为 0 时什么都不加。
+ * blur 的默认边缘策略即使半径为 0 也会套一层 graphicsLayer（用于裁剪），不能无条件挂上去。
+ */
+private fun Modifier.backgroundBlur(radius: Dp): Modifier =
+    if (radius > 0.dp) blur(radius) else this
+
 /** 覆盖式转场：新页面从右侧滑入，盖住保持原位的旧页面。 */
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.slideInFromRight(): EnterTransition =
     slideIntoContainer(
@@ -86,8 +101,19 @@ fun DshaNavHost(navController: NavHostController = rememberNavController()) {
     // 弹窗被关掉后本次会话不再显示；未点"完成"确认时，下次启动仍会弹出
     var onboardingDismissed by remember { mutableStateOf(false) }
 
+    // 快捷设置：首次启动（尚未完成确认）或尚未同意用户协议时出现，非 null 即为要弹出
+    val onboardingSettings = settings?.takeIf {
+        (!it.onboardingCompleted || !it.agreementAccepted) && !onboardingDismissed
+    }
+    // 弹窗打开期间把主内容整体虚化，卡片像浮在毛玻璃上；关闭后虚化再退回去
+    val blurRadius by animateDpAsState(
+        targetValue = if (onboardingSettings != null) ONBOARDING_BLUR_RADIUS else 0.dp,
+        animationSpec = tween(ONBOARDING_BLUR_DURATION_MS),
+        label = "onboarding-blur",
+    )
+
     // 共享元素宿主：导航图外层提供作用域与绘制 overlay，页面内部的元素标注才生效
-    SharedElementHost(modifier = Modifier.fillMaxSize()) {
+    SharedElementHost(modifier = Modifier.fillMaxSize().backgroundBlur(blurRadius)) {
         NavHost(
             navController = navController,
             startDestination = DshaRoutes.PROFILES,
@@ -170,13 +196,15 @@ fun DshaNavHost(navController: NavHostController = rememberNavController()) {
         }
     }
 
-    // 快捷设置：首次启动（尚未完成确认）时弹出；点"完成"保存并标记后才不再出现
-    val currentSettings = settings
-    if (currentSettings != null && !currentSettings.onboardingCompleted && !onboardingDismissed) {
+    // 快捷设置卡片：第一页是用户协议，同意前不可关闭，应用因此无法使用；
+    // 同意后仍需点"完成"保存设置，之后启动不再出现。
+    if (onboardingSettings != null) {
         OnboardingDialog(
-            initialCredentialsEnabled = currentSettings.credentialsEnabled,
-            initialAdaptiveCompatEnabled = currentSettings.adaptiveCompatEnabled,
+            initialCredentialsEnabled = onboardingSettings.credentialsEnabled,
+            initialAdaptiveCompatEnabled = onboardingSettings.adaptiveCompatEnabled,
+            initialAgreementAccepted = onboardingSettings.agreementAccepted,
             onDismiss = { onboardingDismissed = true },
+            onAgreementAccepted = settingsViewModel::acceptAgreement,
             onConfirm = { credentialsEnabled, adaptiveCompatEnabled ->
                 onboardingDismissed = true
                 settingsViewModel.completeOnboarding(credentialsEnabled, adaptiveCompatEnabled)

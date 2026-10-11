@@ -5,7 +5,6 @@
     <!-- 组列表 -->
     <string name="profile_empty_title">还没有连接组</string>
     <string name="profile_empty_desc">添加第一个地址与凭据，之后一键进入服务网页</string>
-    <string name="action_new_profile">新建连接组</string>
     <string name="profile_last_launched">上次启动</string>
     <string name="action_edit">编辑</string>
     <string name="action_delete">删除</string>
@@ -43,7 +42,26 @@
     <string name="setting_adaptive_desc">注入针对 DeepSeek Harness 0.2.0-rc.2 的手机端响应式适配。Harness 更新后如出现显示异常，可关闭此项，仅保留基本页面显示。</string>
     <string name="setting_credentials_disabled_hint">账号密码已在设置中关闭，连接时不会使用</string>
 
-    <!-- 快捷设置（首次启动，两页） -->
+    <!-- 用户协议 -->
+    <string name="title_user_agreement">用户协议</string>
+    <string name="setting_agreement_title">用户协议</string>
+    <string name="setting_agreement_desc">查看服务说明、凭据与隐私的处理方式以及使用条款</string>
+    <string name="agreement_intro">DSHA 是运行在你手机本地的 DeepSeek Harness 入口。使用前请阅读以下条款，同意即表示你已理解并接受全部内容。</string>
+    <string name="agreement_section_service_title">一、服务说明</string>
+    <string name="agreement_section_service_body">本应用只提供浏览器外壳：服务地址与凭据由你自己填写，应用在本机打开对应网页。应用不提供、不托管、不运营任何服务端内容，能否访问取决于你自己的部署环境与网络状况。</string>
+    <string name="agreement_section_credentials_title">二、账号与凭据</string>
+    <string name="agreement_section_credentials_body">你填写的服务地址、账号与密码仅保存在本机应用的私有存储中，不会上传到任何服务器。应用不校验凭据的真实性，也不负责你的服务端安全配置；请勿在不受信任的设备上保存凭据，并自行妥善保管。</string>
+    <string name="agreement_section_privacy_title">三、隐私与数据</string>
+    <string name="agreement_section_privacy_body">应用不收集、不上报设备信息、使用记录与页面内容，也不含统计与广告组件。你在网页中产生的数据由所连接的服务端处理，适用该服务自身的隐私规则。</string>
+    <string name="agreement_section_liability_title">四、免责声明</string>
+    <string name="agreement_section_liability_body">应用按「现状」提供，不对可用性、稳定性与适配效果作出任何担保。因服务端升级、网络异常或页面结构变化导致的功能失效与数据问题，应用不承担责任。请勿将本应用用于任何违法用途。</string>
+    <string name="agreement_section_change_title">五、协议更新</string>
+    <string name="agreement_section_change_body">本协议可能随版本更新调整，更新后的条款随应用一同发布，继续使用即视为接受；若你不同意，请停止使用并卸载本应用。</string>
+    <string name="agreement_onboarding_desc">请阅读并同意以下条款，之后才能继续完成设置并使用本应用。</string>
+    <string name="agreement_accept_checkbox">我已阅读并同意《用户协议》</string>
+    <string name="agreement_accept">同意并继续</string>
+
+    <!-- 快捷设置（首次启动，三页：用户协议、账号密码、响应式兼容） -->
     <string name="onboarding_title">先进行几个设置吧</string>
     <string name="onboarding_credentials_desc">DeepSeek Harness 本身没有登录模块，账号密码只在服务套了 1Panel 等反向代理鉴权时才需要。关闭后直接进入，已填写的凭据会被忽略。</string>
     <string name="onboarding_adaptive_desc">应用会为 DeepSeek Harness 0.2.0-rc.2 注入手机端响应式适配，获得更好的显示效果；Harness 更新后若出现显示异常，可随时关闭。</string>

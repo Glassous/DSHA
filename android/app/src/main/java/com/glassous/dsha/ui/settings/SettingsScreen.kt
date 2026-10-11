@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,6 +29,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,6 +55,7 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(onBack: () -> Unit) {
     val viewModel: SettingsViewModel = dshaViewModel { SettingsViewModel(it) }
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    var agreementVisible by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -104,8 +109,18 @@ fun SettingsScreen(onBack: () -> Unit) {
                 checked = current.adaptiveCompatEnabled,
                 onCheckedChange = viewModel::setAdaptiveCompatEnabled,
             )
+            LinkSettingRow(
+                title = stringResource(R.string.setting_agreement_title),
+                description = stringResource(R.string.setting_agreement_desc),
+                onClick = { agreementVisible = true },
+            )
             Spacer(Modifier.height(8.dp))
         }
+    }
+
+    // 用户协议随时可查：首次同意只发生在快捷设置第一页，这里只是只读的查看入口
+    if (agreementVisible) {
+        UserAgreementDialog(onDismiss = { agreementVisible = false })
     }
 }
 
@@ -121,35 +136,74 @@ fun SwitchSettingRow(
     modifier: Modifier = Modifier,
     description: String? = null,
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-            .clickable { onCheckedChange(!checked) }
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    SettingRowShell(
+        modifier = modifier,
+        onClick = { onCheckedChange(!checked) },
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            if (description != null) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+        SettingRowLabels(title = title, description = description)
         Spacer(Modifier.width(12.dp))
         Switch(
             checked = checked,
             onCheckedChange = null,
         )
+    }
+}
+
+/** 一行跳转设置：标题（+ 可选说明）+ 右侧箭头，用于打开查看类页面或弹窗。 */
+@Composable
+private fun LinkSettingRow(
+    title: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    description: String? = null,
+) {
+    SettingRowShell(modifier = modifier, onClick = onClick) {
+        SettingRowLabels(title = title, description = description)
+        Spacer(Modifier.width(12.dp))
+        Icon(
+            painter = painterResource(R.drawable.ic_chevron_right),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** 设置行外壳：圆角卡片与整行点击样式统一在这里，避免每种设置行各写一份。 */
+@Composable
+private fun SettingRowShell(
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+    content: @Composable RowScope.() -> Unit,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        content = content,
+    )
+}
+
+/** 设置行左侧文字块：标题 + 可选说明。 */
+@Composable
+private fun RowScope.SettingRowLabels(title: String, description: String?) {
+    Column(modifier = Modifier.weight(1f)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        if (description != null) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -168,6 +222,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun setAdaptiveCompatEnabled(enabled: Boolean) {
         viewModelScope.launch { repository.setAdaptiveCompatEnabled(enabled) }
+    }
+
+    /** 快捷设置第一页同意用户协议：记下后本次即可继续，之后启动不再要求同意。 */
+    fun acceptAgreement() {
+        viewModelScope.launch { repository.setAgreementAccepted(true) }
     }
 
     /** 快捷设置确认：保存两项开关并标记完成，之后启动不再弹出。 */

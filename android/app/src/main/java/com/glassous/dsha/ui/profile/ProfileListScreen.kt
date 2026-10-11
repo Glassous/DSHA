@@ -1,7 +1,11 @@
 package com.glassous.dsha.ui.profile
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,7 +23,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -51,9 +54,12 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -77,7 +83,7 @@ fun ProfileListScreen(
     var pendingDelete by remember { mutableStateOf<Profile?>(null) }
     // 列表已按最近使用时间倒序（上次启动的置顶），首个有过启动记录的组即"上次启动"
     val lastLaunchedId = profiles.firstOrNull { it.lastUsedAt > 0L }?.id
-    // 新增连接入口（悬浮按钮与空状态按钮互斥出现，共用同一个共享元素 key）：
+    // 新增连接入口（悬浮按钮与空状态的加号按钮互斥出现，共用同一个共享元素 key）：
     // 点击后按钮的圆角方块展开成"新建连接组"页的整页容器
     val newProfileContainer = Modifier.containerTransformSource(SharedElementKey.NewProfileContainer)
 
@@ -266,55 +272,95 @@ private fun EmptyState(
     newProfileModifier: Modifier = Modifier,
     modifier: Modifier = Modifier,
 ) {
-    val outline = MaterialTheme.colorScheme.outline
     Column(
         modifier = modifier.padding(horizontal = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Box(
-            modifier = Modifier
-                .size(104.dp)
-                .drawBehind {
-                    drawRoundRect(
-                        color = outline.copy(alpha = 0.55f),
-                        cornerRadius = CornerRadius(36.dp.toPx()),
-                        style = Stroke(
-                            width = 1.5.dp.toPx(),
-                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(16f, 12f), 0f),
-                        ),
-                    )
-                },
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(60.dp)
-                    .clip(CircleShape)
-                    .background(BrandGradient),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_add),
-                    contentDescription = null,
-                    tint = Color.White,
-                )
-            }
-        }
+        // 加号区域本身就是"新建连接组"按钮：不再另设一个文案按钮，入口集中到一处
+        EmptyAddTile(
+            onClick = onNew,
+            modifier = newProfileModifier,
+        )
         Spacer(Modifier.height(24.dp))
         Text(
             text = stringResource(R.string.profile_empty_title),
             style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(8.dp))
         Text(
             text = stringResource(R.string.profile_empty_desc),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(24.dp))
-        Button(onClick = onNew, modifier = newProfileModifier) {
-            Text(stringResource(R.string.action_new_profile))
+    }
+}
+
+/** 空状态入口的尺寸、圆角与按下缩放。 */
+private val EMPTY_ADD_TILE_SIZE = 104.dp
+private val EMPTY_ADD_TILE_CORNER = 36.dp
+private const val EMPTY_ADD_TILE_PRESSED_SCALE = 0.94f
+
+/**
+ * 空状态中央的新增入口：整块虚线区域就是按钮，同时是容器变换（按钮展开成整页）的起点。
+ * 应用全局关闭了水波纹，这里用按下轻微缩小作为反馈。
+ */
+@Composable
+private fun EmptyAddTile(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) EMPTY_ADD_TILE_PRESSED_SCALE else 1f,
+        label = "empty-add-tile-press",
+    )
+    val tileColor = MaterialTheme.colorScheme.surfaceContainerLowest
+    val outline = MaterialTheme.colorScheme.outline
+
+    Box(
+        modifier = modifier
+            .size(EMPTY_ADD_TILE_SIZE)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .drawBehind {
+                val corner = CornerRadius(EMPTY_ADD_TILE_CORNER.toPx())
+                // 先铺底色把入口做成一块可点的卡片，再画虚线框
+                drawRoundRect(color = tileColor, cornerRadius = corner)
+                drawRoundRect(
+                    color = outline.copy(alpha = 0.55f),
+                    cornerRadius = corner,
+                    style = Stroke(
+                        width = 1.5.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(16f, 12f), 0f),
+                    ),
+                )
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(60.dp)
+                .clip(CircleShape)
+                .background(BrandGradient),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_add),
+                contentDescription = stringResource(R.string.cd_new_profile),
+                tint = Color.White,
+            )
         }
     }
 }
