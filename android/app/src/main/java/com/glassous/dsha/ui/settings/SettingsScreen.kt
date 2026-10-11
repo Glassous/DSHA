@@ -97,19 +97,19 @@ fun SettingsScreen(onBack: () -> Unit) {
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            SwitchSettingRow(
+            SwitchSettingCard(
                 title = stringResource(R.string.setting_credentials_title),
                 description = stringResource(R.string.setting_credentials_desc),
                 checked = current.credentialsEnabled,
                 onCheckedChange = viewModel::setCredentialsEnabled,
             )
-            SwitchSettingRow(
+            SwitchSettingCard(
                 title = stringResource(R.string.setting_adaptive_title),
                 description = stringResource(R.string.setting_adaptive_desc),
                 checked = current.adaptiveCompatEnabled,
                 onCheckedChange = viewModel::setAdaptiveCompatEnabled,
             )
-            LinkSettingRow(
+            LinkSettingCard(
                 title = stringResource(R.string.setting_agreement_title),
                 description = stringResource(R.string.setting_agreement_desc),
                 onClick = { agreementVisible = true },
@@ -125,41 +125,72 @@ fun SettingsScreen(onBack: () -> Unit) {
 }
 
 /**
- * 一行开关设置：标题（+ 可选说明）+ 右侧开关；整行可点，开关自身不重复响应。
- * 首次启动弹窗里说明文案放在页面上方，此处只传标题。
+ * 设置页里的一项开关：卡片外壳 + 大标题 + 小描述 + 右侧开关；整行可点，开关自身不重复响应。
  */
 @Composable
-fun SwitchSettingRow(
+fun SwitchSettingCard(
     title: String,
+    description: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    description: String? = null,
 ) {
     SettingRowShell(
         modifier = modifier,
         onClick = { onCheckedChange(!checked) },
     ) {
-        SettingRowLabels(title = title, description = description)
-        Spacer(Modifier.width(12.dp))
-        Switch(
-            checked = checked,
-            onCheckedChange = null,
-        )
+        SwitchSettingContent(title = title, description = description, checked = checked)
     }
 }
 
-/** 一行跳转设置：标题（+ 可选说明）+ 右侧箭头，用于打开查看类页面或弹窗。 */
+/**
+ * 同一项开关，但不带卡片外壳：快捷设置本身就是一张大卡片，内部再套卡片会显得零碎。
+ * 排版（大标题 + 小描述 + 右侧开关）与设置页完全一致，两处观感统一。
+ */
 @Composable
-private fun LinkSettingRow(
+fun SwitchSettingRow(
     title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SwitchSettingContent(title = title, description = description, checked = checked)
+    }
+}
+
+/** 一项开关的内容：左侧大标题 + 小描述，右侧开关。 */
+@Composable
+private fun RowScope.SwitchSettingContent(
+    title: String,
+    description: String,
+    checked: Boolean,
+) {
+    SettingRowLabels(title = title, description = description)
+    Spacer(Modifier.width(16.dp))
+    Switch(
+        checked = checked,
+        onCheckedChange = null,
+    )
+}
+
+/** 设置页里的一项跳转：卡片外壳 + 大标题 + 小描述 + 右侧箭头，用于打开查看类页面或弹窗。 */
+@Composable
+private fun LinkSettingCard(
+    title: String,
+    description: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    description: String? = null,
 ) {
     SettingRowShell(modifier = modifier, onClick = onClick) {
         SettingRowLabels(title = title, description = description)
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(16.dp))
         Icon(
             painter = painterResource(R.drawable.ic_chevron_right),
             contentDescription = null,
@@ -181,29 +212,27 @@ private fun SettingRowShell(
             .clip(RoundedCornerShape(20.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerLowest)
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = 18.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         content = content,
     )
 }
 
-/** 设置行左侧文字块：标题 + 可选说明。 */
+/** 设置行左侧文字块：大标题 + 小描述，两级的字号差就是这一行主要的视觉结构。 */
 @Composable
-private fun RowScope.SettingRowLabels(title: String, description: String?) {
+private fun RowScope.SettingRowLabels(title: String, description: String) {
     Column(modifier = Modifier.weight(1f)) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onSurface,
         )
-        if (description != null) {
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

@@ -63,8 +63,6 @@
 
     <!-- 快捷设置（首次启动，三页：用户协议、账号密码、响应式兼容） -->
     <string name="onboarding_title">先进行几个设置吧</string>
-    <string name="onboarding_credentials_desc">DeepSeek Harness 本身没有登录模块，账号密码只在服务套了 1Panel 等反向代理鉴权时才需要。关闭后直接进入，已填写的凭据会被忽略。</string>
-    <string name="onboarding_adaptive_desc">应用会为 DeepSeek Harness 0.2.0-rc.2 注入手机端响应式适配，获得更好的显示效果；Harness 更新后若出现显示异常，可随时关闭。</string>
     <string name="onboarding_next">下一步</string>
     <string name="onboarding_prev">上一步</string>
     <string name="onboarding_confirm">完成</string>

@@ -52,6 +52,7 @@ private val CARD_SHADOW_ELEVATION = 8.dp
 
 /**
  * 首次启动的快捷设置弹窗：一张接近整屏的大卡片，分三页引导。
+ * 每页一项：标题 + 描述（协议页是标题 + 说明 + 正文 + 勾选），排版与设置页一致。
  *
  * 第一页是用户协议，且必须先勾选同意才能进入后面两页；同意前卡片不可关闭
  * （点卡片外或返回键都无效），因此未同意时应用无法使用。
@@ -129,15 +130,15 @@ fun OnboardingDialog(
                             )
 
                             PAGE_CREDENTIALS -> OnboardingPage(
-                                description = stringResource(R.string.onboarding_credentials_desc),
-                                switchTitle = stringResource(R.string.setting_credentials_title),
+                                title = stringResource(R.string.setting_credentials_title),
+                                description = stringResource(R.string.setting_credentials_desc),
                                 checked = credentialsEnabled,
                                 onCheckedChange = { credentialsEnabled = it },
                             )
 
                             else -> OnboardingPage(
-                                description = stringResource(R.string.onboarding_adaptive_desc),
-                                switchTitle = stringResource(R.string.setting_adaptive_title),
+                                title = stringResource(R.string.setting_adaptive_title),
+                                description = stringResource(R.string.setting_adaptive_desc),
                                 checked = adaptiveCompatEnabled,
                                 onCheckedChange = { adaptiveCompatEnabled = it },
                             )
@@ -190,7 +191,7 @@ fun OnboardingDialog(
     }
 }
 
-/** 协议页：一行说明 + 占满剩余高度的协议正文 + 同意勾选框。 */
+/** 协议页：小描述 + 占满剩余高度的协议正文 + 同意勾选框（大标题由卡片标题承担）。 */
 @Composable
 private fun AgreementPage(
     checked: Boolean,
@@ -202,7 +203,7 @@ private fun AgreementPage(
     ) {
         Text(
             text = stringResource(R.string.agreement_onboarding_desc),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         // 正文占据剩余高度并自身滚动：说明与勾选框位置固定，卡片再小也不会把勾选框挤没
@@ -214,25 +215,24 @@ private fun AgreementPage(
     }
 }
 
-/** 单页内容：第一行说明，第二行功能开关；内容在卡片里居中，避免高卡片上方空一大截。 */
+/**
+ * 单页内容：一项设置，排版与设置页完全一致——大标题 + 小描述 + 右侧开关。
+ * 内容在卡片剩余高度里居中，避免高卡片上方空一大截。
+ */
 @Composable
 private fun OnboardingPage(
+    title: String,
     description: String,
-    switchTitle: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+        verticalArrangement = Arrangement.Center,
     ) {
-        Text(
-            text = description,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         SwitchSettingRow(
-            title = switchTitle,
+            title = title,
+            description = description,
             checked = checked,
             onCheckedChange = onCheckedChange,
         )

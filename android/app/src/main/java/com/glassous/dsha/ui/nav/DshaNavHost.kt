@@ -90,9 +90,14 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.slideOutToRight():
 /**
  * 编辑连接组路由同时承载"新建"（无 profileId）与"编辑"两种入口，
  * 只有新建那一侧与列表页的新增连接按钮是共享元素的两端。
+ *
+ * 必须先限定在编辑路由上：列表页、设置页等页面本身就没有 profileId 参数，
+ * 只看参数会把它们一并算成新建页，其可预测返回动画（predictivePopExitTransition）
+ * 会被误设成无位移而消失。
  */
 private fun NavBackStackEntry?.isNewProfile(): Boolean =
-    this?.arguments?.getString(DshaRoutes.ARG_PROFILE_ID).isNullOrBlank()
+    this?.destination?.route == DshaRoutes.EDIT_PATTERN &&
+        arguments?.getString(DshaRoutes.ARG_PROFILE_ID).isNullOrBlank()
 
 @Composable
 fun DshaNavHost(navController: NavHostController = rememberNavController()) {
