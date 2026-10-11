@@ -4,6 +4,14 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// 版本号的唯一事实来源：GitHub Release 的 tag 即 "v" + versionName，
+// 更新检测也拿它与应用自身的 versionName 比较，因此这里改了，发版时的 tag 要跟着改。
+val appVersionName = "1.0.0"
+
+/** 发布产物命名：DSHA-v1.0.0.apk（debug 加后缀），与 tag 一一对应，上传前不必再改名。 */
+fun apkFileName(buildType: String?): String =
+    if (buildType == "release") "DSHA-v$appVersionName.apk" else "DSHA-v$appVersionName-$buildType.apk"
+
 android {
     namespace = "com.glassous.dsha"
     // Compose 1.12 / core-ktx 1.19 起要求 compileSdk 至少 37（本机已安装 android-37.0）
@@ -16,7 +24,7 @@ android {
         minSdk = 33
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0"
+        versionName = appVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -36,6 +44,14 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.outputs.forEach { output ->
+            output.outputFileName.set(apkFileName(variant.buildType))
+        }
     }
 }
 

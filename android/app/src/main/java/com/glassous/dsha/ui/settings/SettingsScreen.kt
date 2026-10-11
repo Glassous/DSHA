@@ -47,14 +47,23 @@ import com.glassous.dsha.R
 import com.glassous.dsha.data.AppSettings
 import com.glassous.dsha.settingsRepository
 import com.glassous.dsha.ui.dshaViewModel
+import com.glassous.dsha.ui.update.UpdateState
+import com.glassous.dsha.ui.update.UpdateViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+/**
+ * 设置页。[updateViewModel] 由导航宿主传入：启动时的自动检测与这里的手动检测共用同一份状态，
+ * 因此必须在导航栈之外创建（页面内部的 ViewModel 作用域只活到离开本页）。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(
+    onBack: () -> Unit,
+    updateViewModel: UpdateViewModel,
+) {
     val viewModel: SettingsViewModel = dshaViewModel { SettingsViewModel(it) }
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     var agreementVisible by remember { mutableStateOf(false) }
@@ -122,6 +131,15 @@ fun SettingsScreen(onBack: () -> Unit) {
                 title = stringResource(R.string.setting_agreement_title),
                 description = stringResource(R.string.setting_agreement_desc),
                 onClick = { agreementVisible = true },
+            )
+            // 检测更新独自成为一个模块，放在最下方：它是"应用自身的维护"，与上面的功能设置不是一类
+            Spacer(Modifier.height(8.dp))
+            UpdateSection(
+                autoCheck = current.autoUpdateCheck,
+                onAutoCheckChange = viewModel::setAutoUpdateCheck,
+                currentVersion = updateViewModel.currentVersion,
+                checking = updateViewModel.state == UpdateState.Checking,
+                onCheckNow = updateViewModel::checkNow,
             )
             Spacer(Modifier.height(8.dp))
         }
@@ -271,6 +289,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun setCredentialsEnabled(enabled: Boolean) {
         viewModelScope.launch { repository.setCredentialsEnabled(enabled) }
+    }
+
+    /** 自动检测更新：关掉后启动时不再查询 GitHub（已忽略的版本记录不受影响）。 */
+    fun setAutoUpdateCheck(enabled: Boolean) {
+        viewModelScope.launch { repository.setAutoUpdateCheck(enabled) }
     }
 
     /** 快捷设置第一页同意用户协议：记下后本次即可继续，之后启动不再要求同意。 */

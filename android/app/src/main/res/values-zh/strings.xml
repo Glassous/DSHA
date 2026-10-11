@@ -42,6 +42,25 @@
     <string name="setting_adaptive_desc">为本连接组把 DeepSeek Harness 网页改造成适合手机宽度的结构，适配版本在下方选择。关闭后不对页面组件做改造，页面仍正常显示。</string>
     <string name="setting_credentials_disabled_hint">账号密码已在设置中关闭，连接时不会使用</string>
 
+    <!-- 版本更新（设置页最下方的独立模块） -->
+    <string name="update_section_title">检测更新</string>
+    <!-- %1$s：当前安装的版本号，如 1.0.0 -->
+    <string name="update_section_version">当前版本 v%1$s</string>
+    <string name="setting_update_title">自动检测更新</string>
+    <string name="update_check_now_title">检测更新</string>
+    <string name="update_check_action">检查更新</string>
+    <string name="update_checking">正在检查…</string>
+    <!-- %1$s：新版本号，如 1.0.1 -->
+    <string name="update_dialog_title">有新版本 v%1$s</string>
+    <string name="update_action_download">下载</string>
+    <string name="update_action_ignore">忽略此版本</string>
+    <string name="update_no_changelog">本次发布未提供更新说明，可前往发布页查看。</string>
+    <string name="update_latest_title">当前已是最新版本</string>
+    <!-- %1$s：当前安装的版本号 -->
+    <string name="update_latest_message">当前版本 v%1$s，已经是最新版本。</string>
+    <string name="update_failed_title">检测更新失败</string>
+    <string name="update_failed_message">无法获取最新版本信息，请检查网络连接后重试。</string>
+
     <!-- 网页适配（按连接组） -->
     <string name="section_web_adapt">网页适配</string>
     <string name="setting_harness_version_title">Harness 版本</string>

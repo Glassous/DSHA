@@ -20,11 +20,15 @@ import kotlinx.coroutines.withContext
  * @param onboardingCompleted 首次启动的快捷设置是否已完成确认；未确认（含中途退出）时每次启动都会再弹。
  * @param agreementAccepted 用户协议是否已同意。未同意时快捷设置停在协议页、应用不可用；
  *   同意后不再要求，协议内容仍可在设置页随时查看。
+ * @param autoUpdateCheck 启动时是否自动检测新版本，默认开启；关闭后不再发起查询。
+ * @param ignoredUpdateVersion 已忽略的版本号。该版本不再提示更新，直到出现更新的版本。
  */
 data class AppSettings(
     val credentialsEnabled: Boolean = false,
     val onboardingCompleted: Boolean = false,
     val agreementAccepted: Boolean = false,
+    val autoUpdateCheck: Boolean = true,
+    val ignoredUpdateVersion: String? = null,
 )
 
 /**
@@ -40,21 +44,39 @@ class SettingsRepository(context: Context) {
 
     val settings: Flow<AppSettings> = state
 
-    suspend fun setCredentialsEnabled(enabled: Boolean) = write(KEY_CREDENTIALS, enabled)
+    suspend fun setCredentialsEnabled(enabled: Boolean) = writeBoolean(KEY_CREDENTIALS, enabled)
 
-    suspend fun setOnboardingCompleted(completed: Boolean) = write(KEY_ONBOARDING, completed)
+    suspend fun setOnboardingCompleted(completed: Boolean) = writeBoolean(KEY_ONBOARDING, completed)
 
-    suspend fun setAgreementAccepted(accepted: Boolean) = write(KEY_AGREEMENT, accepted)
+    suspend fun setAgreementAccepted(accepted: Boolean) = writeBoolean(KEY_AGREEMENT, accepted)
+
+    suspend fun setAutoUpdateCheck(enabled: Boolean) = writeBoolean(KEY_AUTO_UPDATE, enabled)
+
+    /** 忽略某个版本的更新提示：只记版本号，出现更新的版本时照常提示。 */
+    suspend fun setIgnoredUpdateVersion(version: String) = writeString(KEY_IGNORED_UPDATE, version)
 
     private fun read(): AppSettings = AppSettings(
         credentialsEnabled = prefs.getBoolean(KEY_CREDENTIALS, false),
         onboardingCompleted = prefs.getBoolean(KEY_ONBOARDING, false),
         agreementAccepted = prefs.getBoolean(KEY_AGREEMENT, false),
+        autoUpdateCheck = prefs.getBoolean(KEY_AUTO_UPDATE, true),
+        ignoredUpdateVersion = prefs.getString(KEY_IGNORED_UPDATE, null),
     )
 
-    private suspend fun write(key: String, value: Boolean) {
-        // commit 而非 apply：先落盘成功再更新内存，避免界面显示一个没存下去的开关状态
-        val saved = withContext(Dispatchers.IO) { prefs.edit().putBoolean(key, value).commit() }
+    private suspend fun writeBoolean(key: String, value: Boolean) = write(key) { putBoolean(key, value) }
+
+    private suspend fun writeString(key: String, value: String) = write(key) { putString(key, value) }
+
+    /**
+     * 写入统一入口，[change] 描述要改哪一项。
+     * 用 commit 而非 apply：先落盘成功再更新内存，避免界面显示一个没存下去的开关状态。
+     */
+    private suspend fun write(key: String, change: SharedPreferences.Editor.() -> Unit) {
+        val saved = withContext(Dispatchers.IO) {
+            val editor = prefs.edit()
+            change(editor)
+            editor.commit()
+        }
         if (saved) {
             state.value = read()
         } else {
@@ -68,5 +90,7 @@ class SettingsRepository(context: Context) {
         const val KEY_CREDENTIALS = "credentials_enabled"
         const val KEY_ONBOARDING = "onboarding_completed"
         const val KEY_AGREEMENT = "agreement_accepted"
+        const val KEY_AUTO_UPDATE = "auto_update_check"
+        const val KEY_IGNORED_UPDATE = "ignored_update_version"
     }
 }

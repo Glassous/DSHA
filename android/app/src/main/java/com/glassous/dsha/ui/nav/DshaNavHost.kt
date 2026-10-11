@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
@@ -25,6 +26,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.glassous.dsha.R
 import com.glassous.dsha.ui.dshaViewModel
 import com.glassous.dsha.ui.profile.ProfileEditScreen
 import com.glassous.dsha.ui.profile.ProfileListScreen
@@ -37,6 +39,11 @@ import com.glassous.dsha.ui.transition.ContainerTransformTarget
 import com.glassous.dsha.ui.transition.SharedElementDestination
 import com.glassous.dsha.ui.transition.SharedElementHost
 import com.glassous.dsha.ui.transition.SharedElementKey
+import com.glassous.dsha.ui.update.UpdateDialog
+import com.glassous.dsha.ui.update.UpdateMessageDialog
+import com.glassous.dsha.ui.update.UpdateState
+import com.glassous.dsha.ui.update.UpdateViewModel
+import com.glassous.dsha.ui.update.popsDialog
 import com.glassous.dsha.ui.web.WebScreen
 
 /** 路由定义集中在这里，避免各界面硬编码字符串。 */
@@ -62,9 +69,9 @@ object DshaRoutes {
 /** 覆盖式转场时长：进入与退出用同一节奏，观感统一。 */
 private const val TRANSITION_DURATION_MS = 300
 
-/** 快捷设置弹窗打开时的背景虚化半径，以及虚化进出的过渡时长。 */
-private val ONBOARDING_BLUR_RADIUS = 20.dp
-private const val ONBOARDING_BLUR_DURATION_MS = 250
+/** 弹窗打开时的背景虚化半径，以及虚化进出的过渡时长；快捷设置与更新弹窗共用。 */
+private val DIALOG_BLUR_RADIUS = 20.dp
+private const val DIALOG_BLUR_DURATION_MS = 250
 
 /**
  * 背景虚化：半径为 0 时什么都不加。
@@ -103,6 +110,8 @@ private fun NavBackStackEntry?.isNewProfile(): Boolean =
 fun DshaNavHost(navController: NavHostController = rememberNavController()) {
     val settingsViewModel: SettingsViewModel = dshaViewModel { SettingsViewModel(it) }
     val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
+    // 更新检测：进入应用时在 ViewModel 里查一次，确实有新版本才置上，没查到就一直是 null
+    val updateViewModel: UpdateViewModel = dshaViewModel { UpdateViewModel(it) }
     // 弹窗被关掉后本次会话不再显示；未点"完成"确认时，下次启动仍会弹出
     var onboardingDismissed by remember { mutableStateOf(false) }
 
@@ -110,11 +119,14 @@ fun DshaNavHost(navController: NavHostController = rememberNavController()) {
     val onboardingSettings = settings?.takeIf {
         (!it.onboardingCompleted || !it.agreementAccepted) && !onboardingDismissed
     }
+    // 更新弹窗让位给快捷设置：设置还没做完时不弹，两个弹窗不会同时出现，也就不需要争抢遮罩
+    val updateState = updateViewModel.state
+    val updateDialogVisible = updateState.popsDialog && onboardingSettings == null
     // 弹窗打开期间把主内容整体虚化，卡片像浮在毛玻璃上；关闭后虚化再退回去
     val blurRadius by animateDpAsState(
-        targetValue = if (onboardingSettings != null) ONBOARDING_BLUR_RADIUS else 0.dp,
-        animationSpec = tween(ONBOARDING_BLUR_DURATION_MS),
-        label = "onboarding-blur",
+        targetValue = if (onboardingSettings != null || updateDialogVisible) DIALOG_BLUR_RADIUS else 0.dp,
+        animationSpec = tween(DIALOG_BLUR_DURATION_MS),
+        label = "dialog-blur",
     )
 
     // 共享元素宿主：导航图外层提供作用域与绘制 overlay，页面内部的元素标注才生效
@@ -196,7 +208,10 @@ fun DshaNavHost(navController: NavHostController = rememberNavController()) {
             }
 
             composable(DshaRoutes.SETTINGS) {
-                SettingsScreen(onBack = { navController.popBackStack() })
+                SettingsScreen(
+                    onBack = { navController.popBackStack() },
+                    updateViewModel = updateViewModel,
+                )
             }
         }
     }
@@ -214,5 +229,32 @@ fun DshaNavHost(navController: NavHostController = rememberNavController()) {
                 settingsViewModel.completeOnboarding(credentialsEnabled)
             },
         )
+    }
+
+    // 更新弹窗：启动时的自动检测与设置页的手动检测共用这一处。
+    // 取消只关掉本次提示，忽略此版本会记进设置，下载则交给浏览器。
+    if (updateDialogVisible) {
+        when (updateState) {
+            is UpdateState.Available -> UpdateDialog(
+                release = updateState.release,
+                onDismiss = updateViewModel::dismiss,
+                onIgnore = updateViewModel::ignoreCurrent,
+            )
+
+            UpdateState.UpToDate -> UpdateMessageDialog(
+                title = stringResource(R.string.update_latest_title),
+                message = stringResource(R.string.update_latest_message, updateViewModel.currentVersion),
+                onDismiss = updateViewModel::dismiss,
+            )
+
+            UpdateState.Failed -> UpdateMessageDialog(
+                title = stringResource(R.string.update_failed_title),
+                message = stringResource(R.string.update_failed_message),
+                onDismiss = updateViewModel::dismiss,
+            )
+
+            // 空闲与检测进行中都没有弹窗，上面已经拦掉
+            else -> Unit
+        }
     }
 }

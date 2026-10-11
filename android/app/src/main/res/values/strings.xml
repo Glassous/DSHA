@@ -46,6 +46,25 @@
     <string name="setting_adaptive_desc">Restructures the DeepSeek Harness web page of this connection for phone screens; the adapted version is chosen below. When off, page components are left as they are, and the page still displays normally.</string>
     <string name="setting_credentials_disabled_hint">Username and password are turned off in Settings and will not be used</string>
 
+    <!-- App updates (its own module at the bottom of Settings) -->
+    <string name="update_section_title">App updates</string>
+    <!-- %1$s: the installed version number, e.g. 1.0.0 -->
+    <string name="update_section_version">Version v%1$s</string>
+    <string name="setting_update_title">Check on launch</string>
+    <string name="update_check_now_title">Check for updates</string>
+    <string name="update_check_action">Check now</string>
+    <string name="update_checking">Checking…</string>
+    <!-- %1$s: the new version number, e.g. 1.0.1 -->
+    <string name="update_dialog_title">New version v%1$s</string>
+    <string name="update_action_download">Download</string>
+    <string name="update_action_ignore">Skip this version</string>
+    <string name="update_no_changelog">This release has no notes. Open the release page to see what changed.</string>
+    <string name="update_latest_title">You are up to date</string>
+    <!-- %1$s: the installed version number -->
+    <string name="update_latest_message">You are on v%1$s, the latest version.</string>
+    <string name="update_failed_title">Update check failed</string>
+    <string name="update_failed_message">Could not fetch the latest release. Check your network connection and try again.</string>
+
     <!-- Web adaptation (per connection) -->
     <string name="section_web_adapt">Web adaptation</string>
     <string name="setting_harness_version_title">Harness version</string>
