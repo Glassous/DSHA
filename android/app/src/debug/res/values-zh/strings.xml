@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  中文环境必须单独覆盖：values-zh 的 app_name 优先级高于默认 values，
+  只在 src/debug/res/values 覆盖的话，中文界面仍会显示 "DSHA"。
+-->
+<resources>
+    <string name="app_name">DSHA Debug</string>
+</resources>

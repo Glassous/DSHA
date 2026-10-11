@@ -48,6 +48,20 @@ On Windows use `gradlew.bat` instead of `./gradlew`.
 - The debug build enables WebView remote debugging, so `chrome://inspect` can see the loaded page.
 - There is nothing to configure before building: no API keys, no service endpoints, no secrets. The app is pointed at your deployment at runtime, from the connection list.
 
+### Debug and release are two separate apps
+
+The debug build carries its own application ID (`applicationIdSuffix = ".debug"` in `app/build.gradle.kts`) and its own launcher name (overridden in `src/debug/res/`):
+
+| | Release | Debug |
+| --- | --- | --- |
+| Application ID | `com.glassous.dsha` | `com.glassous.dsha.debug` |
+| Launcher name | DSHA | DSHA Debug |
+| Signing | none — sign it yourself | the usual debug key |
+| WebView remote debugging | off | on — `chrome://inspect` |
+| APK | `DSHA-v<version>.apk` | `DSHA-v<version>-debug.apk` |
+
+Because the IDs differ, both builds install side by side on the same device: neither replaces the other, and each keeps its own connection list, settings and user-agreement state. Everything else is shared — the same `versionName`, the same update check, the same code.
+
 ## How the page adaptation works
 
 Adaptation is injected in three layers, so version-specific rules never have to fight the generic ones:
@@ -71,6 +85,7 @@ Adaptation is injected in three layers, so version-specific rules never have to 
 - **The version lives in one place**: `appVersionName` in `android/app/build.gradle.kts`. Bump it, tag the commit `v<the same version>`, publish a GitHub Release — the tag is what the updater compares against the installed `versionName`.
 - Version comparison is lenient semver, so `1.0` equals `1.0.0`.
 - The build names the artifact `DSHA-v<version>.apk` (`DSHA-v<version>-debug.apk` for debug builds). The updater looks for that exact asset name first, then for any `.apk` asset, then falls back to the release page.
+- **Both build types share the version**: `versionName` is deliberately left unsuffixed for debug, because the updater compares it against the release tag. Debug builds are told apart by their application ID, not by their version string.
 - **Bilingual release notes**: split the release body into sections with a line containing only `<!-- en -->` or `<!-- zh -->`. The app picks the section matching its interface language and falls back to English when the section is missing.
 - Update checks are lenient by design: any network error, 403 or 404 is treated as "no update", so a check never gets in the way.
 
@@ -79,7 +94,7 @@ Adaptation is injected in three layers, so version-specific rules never have to 
 ```
 android/
 ├── app/
-│   ├── build.gradle.kts                 # version, SDK levels, dependencies
+│   ├── build.gradle.kts                 # version, build types, SDK levels, dependencies
 │   └── src/
 │       ├── main/java/com/glassous/dsha/
 │       │   ├── MainActivity.kt          # the only Activity: edge-to-edge Compose host
@@ -94,6 +109,7 @@ android/
 │       │   ├── ui/theme/                # colors and typography
 │       │   └── ui/transition/           # shared-element transition
 │       ├── main/res/                    # strings (English default, values-zh), themes, icons
+│       ├── debug/res/                   # debug-only override: app_name → "DSHA Debug"
 │       ├── test/                        # JVM unit tests (update checker)
 │       └── androidTest/                 # instrumentation test source set
 ├── gradle/libs.versions.toml            # version catalog

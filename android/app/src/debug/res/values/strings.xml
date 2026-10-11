@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug 构建专属资源：按资源名逐个覆盖 main，只有这里列出的条目会被替换。
+  debug 包（com.glassous.dsha.debug）与正式版共存安装，应用名要能一眼区分。
+-->
+<resources>
+    <string name="app_name">DSHA Debug</string>
+</resources>

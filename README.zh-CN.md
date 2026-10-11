@@ -48,6 +48,20 @@ Windows 下把 `./gradlew` 换成 `gradlew.bat`。
 - Debug 构建会开启 WebView 远程调试，可用 `chrome://inspect` 查看已加载的页面。
 - 构建前无需任何配置：没有 API Key、没有服务地址、没有密钥。应用在运行时由连接组列表指向你的部署。
 
+### Debug 与 Release 是两个独立的应用
+
+调试版有自己的应用标识（`app/build.gradle.kts` 中的 `applicationIdSuffix = ".debug"`）和自己的桌面名称（在 `src/debug/res/` 中覆盖）：
+
+| | Release | Debug |
+| --- | --- | --- |
+| 应用包名 | `com.glassous.dsha` | `com.glassous.dsha.debug` |
+| 桌面名称 | DSHA | DSHA Debug |
+| 签名 | 未签名 —— 自行签名 | 默认调试签名 |
+| WebView 远程调试 | 关闭 | 开启 —— `chrome://inspect` |
+| 产物 | `DSHA-v<版本>.apk` | `DSHA-v<版本>-debug.apk` |
+
+两者的包名不同，因此可以同时装在同一台设备上：谁也覆盖不了谁，连接组、设置、用户协议接受状态各自独立保存。其余部分完全共用 —— 相同的 `versionName`、相同的更新检测、相同的代码。
+
 ## 网页适配是怎么工作的
 
 适配分三层注入，因此版本专属规则不必与通用规则互相打架：
@@ -71,6 +85,7 @@ Windows 下把 `./gradlew` 换成 `gradlew.bat`。
 - **版本号只有一处事实来源**：`android/app/build.gradle.kts` 中的 `appVersionName`。改完之后把提交打上 `v<同一版本号>` 的 tag 并发布 GitHub Release —— 更新检测正是拿这个 tag 与应用自身的 `versionName` 比较。
 - 版本比较是宽松的语义化版本：`1.0` 与 `1.0.0` 等价。
 - 构建产物命名为 `DSHA-v<版本>.apk`（Debug 为 `DSHA-v<版本>-debug.apk`）。更新时优先寻找同名附件，其次任意 `.apk` 附件，最后回退到发布页。
+- **两个构建类型共用同一个版本号**：Debug 刻意不加 `versionName` 后缀，因为更新检测正是拿它与 Release tag 比较；区分两版靠的是包名，而不是版本字符串。
 - **双语发布说明**：发布正文中用仅含 `<!-- en -->` 或 `<!-- zh -->` 的一行分段。应用按界面语言摘取对应段落，缺少目标语言时回落英文。
 - 更新检测刻意宽松：网络异常、403、404 一律当作「没有更新」，因此检测永远不会挡住正常使用。
 
@@ -79,7 +94,7 @@ Windows 下把 `./gradlew` 换成 `gradlew.bat`。
 ```
 android/
 ├── app/
-│   ├── build.gradle.kts                 # 版本号、SDK 级别、依赖
+│   ├── build.gradle.kts                 # 版本号、构建类型、SDK 级别、依赖
 │   └── src/
 │       ├── main/java/com/glassous/dsha/
 │       │   ├── MainActivity.kt          # 唯一的 Activity：边到边 Compose 宿主
@@ -94,6 +109,7 @@ android/
 │       │   ├── ui/theme/                # 配色与字体
 │       │   └── ui/transition/           # 共享元素转场
 │       ├── main/res/                    # 文案（英文为默认，简体中文在 values-zh）、主题、图标
+│       ├── debug/res/                   # 仅调试版覆盖：app_name → "DSHA Debug"
 │       ├── test/                        # JVM 单元测试（更新检测）
 │       └── androidTest/                 # 仪器测试源集
 ├── gradle/libs.versions.toml            # 版本目录

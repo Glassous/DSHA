@@ -30,6 +30,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            // 调试包使用独立应用标识：可与正式版共存安装，本地数据各存各的，互不覆盖。
+            // 应用名在 src/debug/res 中覆盖为 "DSHA Debug"，同样按 build type 区分。
+            applicationIdSuffix = ".debug"
+        }
         release {
             optimization {
                 enable = false
