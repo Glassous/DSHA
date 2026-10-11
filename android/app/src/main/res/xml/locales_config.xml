@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  应用支持的语言：交给系统用于按应用语言设置（系统设置里的「应用语言」入口）。
+  文案默认放在 values/（简体中文），英文在 values-en/。
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="zh-CN" />
+    <locale android:name="en" />
+</locale-config>

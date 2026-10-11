@@ -35,6 +35,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -56,6 +58,12 @@ fun SettingsScreen(onBack: () -> Unit) {
     val viewModel: SettingsViewModel = dshaViewModel { SettingsViewModel(it) }
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     var agreementVisible by remember { mutableStateOf(false) }
+    var languagePickerVisible by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    // 语言由系统按应用保存：进页面时读一次即可。切换语言会重建 Activity（配置变化），
+    // 这里以 Configuration 为 key，万一将来改为自行处理配置变化也能重新读到最新选择
+    val configuration = LocalConfiguration.current
+    val appLanguage = remember(configuration) { context.currentAppLanguage() }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -110,6 +118,11 @@ fun SettingsScreen(onBack: () -> Unit) {
                 onCheckedChange = viewModel::setAdaptiveCompatEnabled,
             )
             LinkSettingCard(
+                title = stringResource(R.string.setting_language_title),
+                description = stringResource(appLanguage.labelRes),
+                onClick = { languagePickerVisible = true },
+            )
+            LinkSettingCard(
                 title = stringResource(R.string.setting_agreement_title),
                 description = stringResource(R.string.setting_agreement_desc),
                 onClick = { agreementVisible = true },
@@ -121,6 +134,17 @@ fun SettingsScreen(onBack: () -> Unit) {
     // 用户协议随时可查：首次同意只发生在快捷设置第一页，这里只是只读的查看入口
     if (agreementVisible) {
         UserAgreementDialog(onDismiss = { agreementVisible = false })
+    }
+
+    if (languagePickerVisible) {
+        LanguagePickerDialog(
+            current = appLanguage,
+            onSelect = { language ->
+                languagePickerVisible = false
+                context.applyAppLanguage(language)
+            },
+            onDismiss = { languagePickerVisible = false },
+        )
     }
 }
 
