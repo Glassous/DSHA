@@ -116,12 +116,6 @@ fun SettingsScreen(
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            SwitchSettingCard(
-                title = stringResource(R.string.setting_credentials_title),
-                description = stringResource(R.string.setting_credentials_desc),
-                checked = current.credentialsEnabled,
-                onCheckedChange = viewModel::setCredentialsEnabled,
-            )
             LinkSettingCard(
                 title = stringResource(R.string.setting_language_title),
                 description = appLanguage.optionName(deviceLanguage),
@@ -145,7 +139,7 @@ fun SettingsScreen(
         }
     }
 
-    // 用户协议随时可查：首次同意只发生在快捷设置第一页，这里只是只读的查看入口
+    // 用户协议随时可查：首次同意发生在快捷设置里，这里只是只读的查看入口
     if (agreementVisible) {
         UserAgreementDialog(onDismiss = { agreementVisible = false })
     }
@@ -164,7 +158,7 @@ fun SettingsScreen(
 
 /**
  * 一项开关：卡片外壳 + 大标题 + 小描述 + 右侧开关；整行可点，开关自身不重复响应。
- * 设置页与连接组编辑页共用（后者用它承载响应式适配开关）。
+ * 供连接组编辑页使用（承载响应式适配与账号密码开关）。
  */
 @Composable
 fun SwitchSettingCard(
@@ -177,28 +171,6 @@ fun SwitchSettingCard(
     SettingRowShell(
         modifier = modifier,
         onClick = { onCheckedChange(!checked) },
-    ) {
-        SwitchSettingContent(title = title, description = description, checked = checked)
-    }
-}
-
-/**
- * 同一项开关，但不带卡片外壳：快捷设置本身就是一张大卡片，内部再套卡片会显得零碎。
- * 排版（大标题 + 小描述 + 右侧开关）与设置页完全一致，两处观感统一。
- */
-@Composable
-fun SwitchSettingRow(
-    title: String,
-    description: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable { onCheckedChange(!checked) },
-        verticalAlignment = Alignment.CenterVertically,
     ) {
         SwitchSettingContent(title = title, description = description, checked = checked)
     }
@@ -287,10 +259,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val settings: StateFlow<AppSettings?> = repository.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    fun setCredentialsEnabled(enabled: Boolean) {
-        viewModelScope.launch { repository.setCredentialsEnabled(enabled) }
-    }
-
     /** 自动检测更新：关掉后启动时不再查询 GitHub（已忽略的版本记录不受影响）。 */
     fun setAutoUpdateCheck(enabled: Boolean) {
         viewModelScope.launch { repository.setAutoUpdateCheck(enabled) }
@@ -301,11 +269,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch { repository.setAgreementAccepted(true) }
     }
 
-    /** 快捷设置确认：保存开关并标记完成，之后启动不再弹出。 */
-    fun completeOnboarding(credentialsEnabled: Boolean) {
-        viewModelScope.launch {
-            repository.setCredentialsEnabled(credentialsEnabled)
-            repository.setOnboardingCompleted(true)
-        }
+    /** 快捷设置确认：标记完成，之后启动不再弹出。 */
+    fun completeOnboarding() {
+        viewModelScope.launch { repository.setOnboardingCompleted(true) }
     }
 }

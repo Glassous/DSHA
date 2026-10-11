@@ -11,12 +11,9 @@ import kotlinx.coroutines.withContext
 /**
  * 应用级设置。
  *
- * 网页适配（响应式适配开关与 Harness 版本）不在这里：它随连接组存放，
- * 因为同一个应用可能同时连向不同版本的 Harness，见 [Profile]。
+ * 网页适配（响应式适配开关与 Harness 版本）与账号密码（是否使用凭据）不在这里：
+ * 它们随连接组存放，因为同一个应用可能同时连向不同版本、不同鉴权方式的 Harness，见 [Profile]。
  *
- * @param credentialsEnabled 是否使用连接组里的账号密码。DeepSeek Harness 本身没有登录模块，
- *   账号密码只是 1Panel 等反向代理在入口加 Basic 鉴权的产物，默认关闭；
- *   关闭后连接直接进入，已填写的凭据会被忽略。
  * @param onboardingCompleted 首次启动的快捷设置是否已完成确认；未确认（含中途退出）时每次启动都会再弹。
  * @param agreementAccepted 用户协议是否已同意。未同意时快捷设置停在协议页、应用不可用；
  *   同意后不再要求，协议内容仍可在设置页随时查看。
@@ -24,7 +21,6 @@ import kotlinx.coroutines.withContext
  * @param ignoredUpdateVersion 已忽略的版本号。该版本不再提示更新，直到出现更新的版本。
  */
 data class AppSettings(
-    val credentialsEnabled: Boolean = false,
     val onboardingCompleted: Boolean = false,
     val agreementAccepted: Boolean = false,
     val autoUpdateCheck: Boolean = true,
@@ -44,8 +40,6 @@ class SettingsRepository(context: Context) {
 
     val settings: Flow<AppSettings> = state
 
-    suspend fun setCredentialsEnabled(enabled: Boolean) = writeBoolean(KEY_CREDENTIALS, enabled)
-
     suspend fun setOnboardingCompleted(completed: Boolean) = writeBoolean(KEY_ONBOARDING, completed)
 
     suspend fun setAgreementAccepted(accepted: Boolean) = writeBoolean(KEY_AGREEMENT, accepted)
@@ -56,7 +50,6 @@ class SettingsRepository(context: Context) {
     suspend fun setIgnoredUpdateVersion(version: String) = writeString(KEY_IGNORED_UPDATE, version)
 
     private fun read(): AppSettings = AppSettings(
-        credentialsEnabled = prefs.getBoolean(KEY_CREDENTIALS, false),
         onboardingCompleted = prefs.getBoolean(KEY_ONBOARDING, false),
         agreementAccepted = prefs.getBoolean(KEY_AGREEMENT, false),
         autoUpdateCheck = prefs.getBoolean(KEY_AUTO_UPDATE, true),
@@ -87,7 +80,6 @@ class SettingsRepository(context: Context) {
     private companion object {
         const val TAG = "SettingsRepository"
         const val PREFS_NAME = "dsha_settings"
-        const val KEY_CREDENTIALS = "credentials_enabled"
         const val KEY_ONBOARDING = "onboarding_completed"
         const val KEY_AGREEMENT = "agreement_accepted"
         const val KEY_AUTO_UPDATE = "auto_update_check"

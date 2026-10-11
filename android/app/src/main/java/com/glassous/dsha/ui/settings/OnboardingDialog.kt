@@ -36,13 +36,12 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.glassous.dsha.R
 
-/** 快捷设置的页序：语言、用户协议、账号密码。 */
+/** 快捷设置的页序：语言、用户协议。 */
 private const val PAGE_LANGUAGE = 0
 private const val PAGE_AGREEMENT = 1
-private const val PAGE_CREDENTIALS = 2
 
 /** 完整页序；语言页是否出现由设备语言决定，见 [needsLanguageChoice]。 */
-private val ONBOARDING_PAGES = listOf(PAGE_LANGUAGE, PAGE_AGREEMENT, PAGE_CREDENTIALS)
+private val ONBOARDING_PAGES = listOf(PAGE_LANGUAGE, PAGE_AGREEMENT)
 
 /** 卡片与屏幕边缘的留白：卡片借此放大到接近整屏，又不至于贴着屏幕边框。 */
 private val CARD_MARGIN_HORIZONTAL = 20.dp
@@ -57,26 +56,25 @@ private val CARD_SHADOW_ELEVATION = 8.dp
 
 /**
  * 首次启动的快捷设置弹窗：一张接近整屏的大卡片，每页一项（标题 + 描述 + 控件），排版与设置页一致。
- * 页序为语言、用户协议、账号密码，其中语言页只在设备语言既不是中文也不是英文时出现：
+ * 页序为语言、用户协议，其中语言页只在设备语言既不是中文也不是英文时出现：
  * 这两种语言的设备界面已经符合预期，不必多问一句。
  *
  * 语言放在协议之前：界面语言不符合预期时，用户可以在同意条款前先换语言。
  * 协议页必须先勾选同意才能继续；同意前卡片不可关闭（点卡片外或返回键都无效），
- * 因此未同意时应用无法使用。同意之后回到原有规则：只有最后一页点"完成"才会保存并标记已确认，
+ * 因此未同意时应用无法使用。协议是最后一页：同意即完成，保存并标记已确认；
  * 中途关闭只是本次关闭（不保存），下次启动仍会弹出。
  *
- * 网页适配（响应式适配开关与 Harness 版本）不在这里问：它属于连接组自身的配置，
- * 在新建/编辑连接组时设置。
+ * 账号密码与网页适配不在这里问：它们都是连接组自身的配置，
+ * 在新建/编辑连接组时逐组设置。
  *
  * 卡片外的背景由 DshaNavHost 统一虚化，这里只管卡片本身。
  */
 @Composable
 fun OnboardingDialog(
-    initialCredentialsEnabled: Boolean,
     initialAgreementAccepted: Boolean,
     onDismiss: () -> Unit,
     onAgreementAccepted: () -> Unit,
-    onConfirm: (credentialsEnabled: Boolean) -> Unit,
+    onConfirm: () -> Unit,
 ) {
     val context = LocalContext.current
     // 语言由系统按应用保存：换语言会重建 Activity（配置变化），以 Configuration 为 key 重新读取
@@ -92,7 +90,6 @@ fun OnboardingDialog(
     var pageIndex by rememberSaveable { mutableIntStateOf(0) }
     val page = pages[pageIndex.coerceIn(pages.indices)]
     val onLastPage = pageIndex >= pages.lastIndex
-    var credentialsEnabled by rememberSaveable { mutableStateOf(initialCredentialsEnabled) }
     // 勾选只决定按钮是否可点，本身还不算同意
     var agreementChecked by rememberSaveable { mutableStateOf(initialAgreementAccepted) }
     // 同意是否已生效（本次按下或此前同意过）：未生效时弹窗不可关闭
@@ -122,8 +119,7 @@ fun OnboardingDialog(
                     text = stringResource(
                         when (page) {
                             PAGE_LANGUAGE -> R.string.title_language
-                            PAGE_AGREEMENT -> R.string.title_user_agreement
-                            else -> R.string.onboarding_title
+                            else -> R.string.title_user_agreement
                         },
                     ),
                     style = MaterialTheme.typography.headlineSmall,
@@ -152,16 +148,9 @@ fun OnboardingDialog(
                                 onSelect = context::applyAppLanguage,
                             )
 
-                            PAGE_AGREEMENT -> AgreementPage(
+                            else -> AgreementPage(
                                 checked = agreementChecked,
                                 onCheckedChange = { agreementChecked = it },
-                            )
-
-                            else -> OnboardingPage(
-                                title = stringResource(R.string.setting_credentials_title),
-                                description = stringResource(R.string.setting_credentials_desc),
-                                checked = credentialsEnabled,
-                                onCheckedChange = { credentialsEnabled = it },
                             )
                         }
                     }
@@ -188,10 +177,11 @@ fun OnboardingDialog(
                                 page == PAGE_AGREEMENT -> {
                                     agreementAccepted = true
                                     onAgreementAccepted()
-                                    pageIndex++
+                                    // 协议是最后一页：同意即完成，没有下一页可翻
+                                    if (onLastPage) onConfirm() else pageIndex++
                                 }
 
-                                onLastPage -> onConfirm(credentialsEnabled)
+                                onLastPage -> onConfirm()
 
                                 else -> pageIndex++
                             }
@@ -253,30 +243,6 @@ private fun AgreementPage(
         // 正文占据剩余高度并自身滚动：说明与勾选框位置固定，卡片再小也不会把勾选框挤没
         UserAgreementBody(modifier = Modifier.weight(1f))
         AgreementAcceptRow(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-        )
-    }
-}
-
-/**
- * 单页内容：一项设置，排版与设置页完全一致——大标题 + 小描述 + 右侧开关。
- * 内容在卡片剩余高度里居中，避免高卡片上方空一大截。
- */
-@Composable
-private fun OnboardingPage(
-    title: String,
-    description: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
-    ) {
-        SwitchSettingRow(
-            title = title,
-            description = description,
             checked = checked,
             onCheckedChange = onCheckedChange,
         )

@@ -190,7 +190,6 @@ fun WebScreen(
                     DshaWebView(
                         profile = currentProfile,
                         startUrl = currentStartUrl,
-                        credentialsEnabled = viewModel.credentialsEnabled,
                         // 网页适配按连接组走：同一个应用可能同时连向不同版本的 Harness
                         adaptiveCompatEnabled = currentProfile.adaptiveCompatEnabled,
                         harnessVersion = currentProfile.harnessVersion,

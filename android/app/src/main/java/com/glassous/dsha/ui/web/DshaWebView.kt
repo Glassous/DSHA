@@ -67,7 +67,9 @@ enum class WebEvent {
  * 网页壳本体。WebView 只在 [remember] 中创建一次，
  * 因此调用方需要保证同一个实例只服务同一个连接组（用 `key(profile.id)` 包一层即可）。
  *
- * @param credentialsEnabled 是否使用连接组里的账号密码应答鉴权与自动填充；关闭时凭据被忽略
+ * 是否使用账号密码应答鉴权与自动填充取自 [Profile.credentialsEnabled]：同一实例只服务一个
+ * 连接组，本页存活期间该值不会变，改动它需要离开本页再重新进入（WebView 随之重建）。
+ *
  * @param adaptiveCompatEnabled 是否注入该版本专属的组件级改造；关闭后不做任何组件改造，
  *   页面仍由基础注入层（安全区、视口高度链兜底）保证正常显示
  * @param harnessVersion 版本层适配所依据的 Harness 版本，取自连接组自身
@@ -78,7 +80,6 @@ enum class WebEvent {
 fun DshaWebView(
     profile: Profile,
     startUrl: String,
-    credentialsEnabled: Boolean,
     adaptiveCompatEnabled: Boolean,
     harnessVersion: HarnessVersion,
     modifier: Modifier = Modifier,
@@ -103,7 +104,6 @@ fun DshaWebView(
     val safeTopState = rememberUpdatedState(safeTopDp)
     val safeBottomState = rememberUpdatedState(safeBottomDp)
     // 设置可能在页面存活期间被改动：WebView 回调里始终读最新值，无需重建 WebView
-    val credentialsEnabledState = rememberUpdatedState(credentialsEnabled)
     val adaptiveCompatEnabledState = rememberUpdatedState(adaptiveCompatEnabled)
     val harnessVersionState = rememberUpdatedState(harnessVersion)
 
@@ -137,7 +137,6 @@ fun DshaWebView(
                 alive = alive,
                 safeTop = { safeTopState.value },
                 safeBottom = { safeBottomState.value },
-                credentialsEnabled = { credentialsEnabledState.value },
                 adaptiveCompatEnabled = { adaptiveCompatEnabledState.value },
                 harnessVersion = { harnessVersionState.value },
                 onCanGoBack = { value -> onCanGoBackState.value(value) },
@@ -270,7 +269,6 @@ private fun buildWebViewClient(
     alive: MutableState<Boolean>,
     safeTop: () -> Float,
     safeBottom: () -> Float,
-    credentialsEnabled: () -> Boolean,
     adaptiveCompatEnabled: () -> Boolean,
     harnessVersion: () -> HarnessVersion,
     onCanGoBack: (Boolean) -> Unit,
@@ -298,8 +296,8 @@ private fun buildWebViewClient(
     ) {
         val key = "$host|$realm"
         val attempts = authAttempts[key] ?: 0
-        // 设置里关闭凭据时一律放弃应答：站点确实需要 Basic 鉴权时会走失败流程
-        if (!credentialsEnabled() || profile.username.isBlank() || attempts >= MAX_AUTH_ATTEMPTS) {
+        // 本组关闭凭据时一律放弃应答：站点确实需要 Basic 鉴权时会走失败流程
+        if (!profile.credentialsEnabled || profile.username.isBlank() || attempts >= MAX_AUTH_ATTEMPTS) {
             handler.cancel()
             onEvent(WebEvent.AUTH_FAILED)
             return
@@ -322,8 +320,8 @@ private fun buildWebViewClient(
 
     override fun onPageFinished(view: WebView, url: String?) {
         onCanGoBack(view.canGoBack())
-        // 关闭凭据时不自动填充登录表单
-        if (credentialsEnabled()) {
+        // 本组关闭凭据时不自动填充登录表单
+        if (profile.credentialsEnabled) {
             scheduleAutoFill(view, profile, alive, attempt = 0, onFallback = { onEvent(WebEvent.AUTOFILL_FALLBACK) })
         }
         // 基础层：安全区 + 视口高度链兜底，只保证页面能显示，不碰任何组件；

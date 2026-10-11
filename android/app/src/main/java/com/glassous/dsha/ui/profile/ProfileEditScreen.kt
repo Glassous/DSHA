@@ -6,13 +6,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -66,6 +70,10 @@ fun ProfileEditScreen(
         // 点击顶部栏、表单间隙等非输入区域时收起键盘
         modifier = Modifier.clearFocusOnTap(),
         containerColor = MaterialTheme.colorScheme.background,
+        // 底部沉浸：滚动内容一直画到屏幕底边（含小白条区域），滚动中内容从底边滑出；
+        // 底部安全距离改由滚动内容末尾的 Spacer 承担（见下方 Column），滚到底时最后一项停在小白条之上。
+        // 顶部状态栏由顶栏自己让出，左右挖孔区仍按窗口 insets 让出。
+        contentWindowInsets = WindowInsets.systemBars.only(WindowInsetsSides.Horizontal),
         topBar = {
             TopAppBar(
                 title = {
@@ -118,13 +126,15 @@ fun ProfileEditScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
-                // Scaffold 的 innerPadding 已经让出了导航栏（小白条）高度，
-                // 这里只补 IME 中超出导航栏的部分，避免键盘弹出时底部多出一段空白。
+                // 键盘补白：内层 padding 随滚动内容一起走，补出 IME 中超出导航栏的部分
+                // （导航栏那一段已由末尾 Spacer 承担），滚到底时最后一项正好停在键盘上方。
                 .windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets.navigationBars))
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             BasicInfoFields(viewModel)
+
+            CredentialsFields(viewModel)
 
             WebAdaptFields(
                 viewModel = viewModel,
@@ -142,6 +152,9 @@ fun ProfileEditScreen(
             }
 
             Spacer(Modifier.height(16.dp))
+            // 底部安全距离：作为内容末尾的留白随滚动移动——滚到底时最后一项（保存按钮）
+            // 停在小白条之上，滚动过程中内容则一直延伸到屏幕底边（沉浸）
+            Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
         }
     }
 
@@ -209,27 +222,36 @@ private fun BasicInfoFields(viewModel: ProfileEditViewModel) {
             shape = RoundedCornerShape(20.dp),
             modifier = Modifier.fillMaxWidth(),
         )
-
-        // 账号密码由应用设置统一控制：关闭时不显示字段，保存也不校验
-        if (viewModel.credentialsEnabled) {
-            CredentialsFields(viewModel)
-        } else {
-            Text(
-                text = stringResource(R.string.setting_credentials_disabled_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }
 
-/** 账号密码字段：仅在应用设置开启凭据时显示。 */
+/**
+ * 账号密码：本组专属的凭据开关与字段。
+ *
+ * 关闭时字段一并收起，保存也不校验——DeepSeek Harness 本身没有登录模块，
+ * 账号密码只是 1Panel 等反向代理在入口加 Basic 鉴权的产物，只有部分部署需要。
+ */
 @Composable
 private fun CredentialsFields(viewModel: ProfileEditViewModel) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        Text(
+            text = stringResource(R.string.section_credentials),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        SwitchSettingCard(
+            title = stringResource(R.string.setting_credentials_title),
+            description = stringResource(R.string.setting_credentials_desc),
+            checked = viewModel.credentialsEnabled,
+            onCheckedChange = { viewModel.credentialsEnabled = it },
+        )
+
+        if (!viewModel.credentialsEnabled) return@Column
+
         OutlinedTextField(
             value = viewModel.username,
             onValueChange = { viewModel.username = it },

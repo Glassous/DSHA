@@ -11,10 +11,8 @@ import com.glassous.dsha.data.HarnessVersion
 import com.glassous.dsha.data.Profile
 import com.glassous.dsha.data.UrlUtils
 import com.glassous.dsha.profileRepository
-import com.glassous.dsha.settingsRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -44,10 +42,6 @@ class ProfileEditViewModel(
     var loaded by mutableStateOf(false)
         private set
 
-    /** 应用设置：是否使用账号密码；关闭时表单不显示凭据字段也不校验。 */
-    var credentialsEnabled by mutableStateOf(false)
-        private set
-
     /** 编辑时保留原有的最近使用时间，避免保存后列表排序跳变。 */
     private var lastUsedAt: Long = 0L
 
@@ -56,6 +50,9 @@ class ProfileEditViewModel(
     var username by mutableStateOf("")
     var password by mutableStateOf("")
     var passwordVisible by mutableStateOf(false)
+
+    /** 本组是否使用账号密码；关闭时表单不显示凭据字段，保存也不校验。 */
+    var credentialsEnabled by mutableStateOf(false)
 
     /** 本组的网页适配：是否注入手机端响应式适配；关闭时表单不显示版本行。 */
     var adaptiveCompatEnabled by mutableStateOf(true)
@@ -74,8 +71,6 @@ class ProfileEditViewModel(
 
     init {
         viewModelScope.launch {
-            // 先读设置再放行表单：避免凭据字段先出现再消失的跳动
-            credentialsEnabled = application.settingsRepository.settings.first().credentialsEnabled
             if (profileId != null) {
                 repository.find(profileId)?.let(::apply)
             }
@@ -90,7 +85,7 @@ class ProfileEditViewModel(
             normalized == null -> R.string.error_base_url_invalid
             else -> null
         }
-        // 设置里关闭凭据时不需要账号密码，直接跳过校验（已填写的值原样保留）
+        // 本组关闭凭据时不需要账号密码，直接跳过校验（已填写的值原样保留）
         usernameError =
             if (credentialsEnabled && username.isBlank()) R.string.error_username_required else null
         passwordError =
@@ -119,6 +114,7 @@ class ProfileEditViewModel(
         baseUrl = normalizedUrl,
         username = username.trim(),
         password = password,
+        credentialsEnabled = credentialsEnabled,
         lastUsedAt = lastUsedAt,
         adaptiveCompatEnabled = adaptiveCompatEnabled,
         harnessVersion = harnessVersion,
@@ -129,6 +125,7 @@ class ProfileEditViewModel(
         name = profile.name
         username = profile.username
         password = profile.password
+        credentialsEnabled = profile.credentialsEnabled
         lastUsedAt = profile.lastUsedAt
         adaptiveCompatEnabled = profile.adaptiveCompatEnabled
         harnessVersion = profile.harnessVersion

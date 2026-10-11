@@ -216,17 +216,16 @@ fun DshaNavHost(navController: NavHostController = rememberNavController()) {
         }
     }
 
-    // 快捷设置卡片：第一页是用户协议，同意前不可关闭，应用因此无法使用；
-    // 同意后仍需点"完成"保存设置，之后启动不再出现。
+    // 快捷设置卡片：最后一页是用户协议，同意前不可关闭，应用因此无法使用；
+    // 同意即完成并保存设置，之后启动不再出现。
     if (onboardingSettings != null) {
         OnboardingDialog(
-            initialCredentialsEnabled = onboardingSettings.credentialsEnabled,
             initialAgreementAccepted = onboardingSettings.agreementAccepted,
             onDismiss = { onboardingDismissed = true },
             onAgreementAccepted = settingsViewModel::acceptAgreement,
-            onConfirm = { credentialsEnabled ->
+            onConfirm = {
                 onboardingDismissed = true
-                settingsViewModel.completeOnboarding(credentialsEnabled)
+                settingsViewModel.completeOnboarding()
             },
         )
     }

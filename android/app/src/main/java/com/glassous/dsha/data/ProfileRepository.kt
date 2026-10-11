@@ -73,6 +73,7 @@ class ProfileRepository(context: Context) {
                     .put("baseUrl", profile.baseUrl)
                     .put("username", profile.username)
                     .put("password", profile.password)
+                    .put("credentialsEnabled", profile.credentialsEnabled)
                     .put("lastUsedAt", profile.lastUsedAt)
                     // 只存版本号本身：读取时由 HarnessVersion.fromStored 找回枚举，
                     // 已下线的版本号会自然回退到当前适配的最高版本
@@ -89,12 +90,20 @@ class ProfileRepository(context: Context) {
             val array = JSONArray(raw)
             List(array.length()) { index ->
                 val item = array.getJSONObject(index)
+                val username = item.optString("username")
+                val password = item.optString("password")
                 Profile(
                     id = item.optString("id").ifBlank { Profile.newId() },
                     name = item.optString("name"),
                     baseUrl = item.optString("baseUrl"),
-                    username = item.optString("username"),
-                    password = item.optString("password"),
+                    username = username,
+                    password = password,
+                    // 旧数据没有这个键（凭据开关原先在应用设置里）：已填写凭据的组按启用迁移，
+                    // 避免升级后原有凭据被静默忽略；没填凭据的组保持默认的直接进入
+                    credentialsEnabled = item.optBoolean(
+                        "credentialsEnabled",
+                        username.isNotBlank() || password.isNotEmpty(),
+                    ),
                     lastUsedAt = item.optLong("lastUsedAt"),
                     // 旧数据没有这两个键：默认开启适配 + 当前适配的最高版本，与加入该设置前的行为一致
                     adaptiveCompatEnabled = item.optBoolean("adaptiveCompatEnabled", true),
