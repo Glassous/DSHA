@@ -68,7 +68,7 @@ Adaptation is injected in three layers, so version-specific rules never have to 
 
 | Layer | File | Role |
 | --- | --- | --- |
-| Base | `ui/web/adapt/BaseAdapt.kt` | Always applied — for every supported DSH version, and even when adaptation is switched off: safe-area padding, viewport-unit fallbacks, scroll behaviour. |
+| Base | `ui/web/adapt/BaseAdapt.kt` | Always applied — for every supported DSH version, and even when adaptation is switched off: safe-area padding, shell height-chain fallback (plain web pages included), dialog sizing and centring. |
 | Version | `ui/web/adapt/AdaptInjection.kt` | Packages the CSS/JS of the active layers into one script, substitutes tokens such as `__DSHA_SAFE_TOP__` with real values, and runs it with `evaluateJavascript`. |
 | Per version | `ui/web/adapt/v020rc2/V020Rc2Adapt.kt` | Component-level CSS/JS for a single DSH release (currently `0.2.0-rc.2`). Rules anchor on class-name suffixes so build hashes do not matter. |
 

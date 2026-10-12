@@ -68,7 +68,7 @@ Windows 下把 `./gradlew` 换成 `gradlew.bat`。
 
 | 层 | 文件 | 职责 |
 | --- | --- | --- |
-| 基础层 | `ui/web/adapt/BaseAdapt.kt` | 始终施加 —— 对所有已适配的 DSH 版本、乃至适配开关关闭时都生效：安全区 padding、视口单位兜底、滚动行为。 |
+| 基础层 | `ui/web/adapt/BaseAdapt.kt` | 始终施加 —— 对所有已适配的 DSH 版本、乃至适配开关关闭时都生效：安全区 padding、外壳高度链兜底（普通网页同样适用）、弹窗尺寸与居中兜底。 |
 | 版本层 | `ui/web/adapt/AdaptInjection.kt` | 把当前生效各层的 CSS/JS 组装为一段脚本，将 `__DSHA_SAFE_TOP__` 之类的 token 替换为真实值，再交给 `evaluateJavascript` 执行。 |
 | 具体版本 | `ui/web/adapt/v020rc2/V020Rc2Adapt.kt` | 针对某一个 DSH 版本的组件级 CSS/JS（当前为 `0.2.0-rc.2`）。规则以类名后缀为锚点，因此不受构建哈希前缀影响。 |
 
