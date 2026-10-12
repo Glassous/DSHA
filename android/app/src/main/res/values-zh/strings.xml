@@ -134,6 +134,25 @@
     <string name="web_no_browser">未找到可处理该链接的应用</string>
     <string name="web_download_started">已开始下载</string>
     <string name="web_download_failed">下载失败</string>
+    <!-- 网页壳的错误页：界面只显示错误码，其余信息随「复制错误信息」带走 -->
+    <string name="action_copy_error">复制错误信息</string>
+    <!-- 复制成功后按钮上的即时反馈 -->
+    <string name="action_copied">已复制</string>
+    <string name="error_copy_label">加载错误</string>
+    <!-- %1$s：界面上显示的错误码，如「404」「-2」 -->
+    <string name="error_copy_code">错误码：%1$s</string>
+    <!-- %1$s：WebView 的错误描述、HTTP 原因短语，服务端没给时用标准短语兜底 -->
+    <string name="error_copy_detail">详情：%1$s</string>
+    <!-- %1$s：加载失败的地址 -->
+    <string name="error_copy_url">地址：%1$s</string>
+    <!-- %1$s：出错的连接组名称 -->
+    <string name="error_copy_profile">连接组：%1$s</string>
+    <!-- %1$s：本地时间（带时区偏移），如「2026-10-12 21:03:45 +08:00」 -->
+    <string name="error_copy_time">时间：%1$s</string>
+    <!-- %1$s：当前安装的版本号，如「1.0.0」 -->
+    <string name="error_copy_app_version">应用版本：%1$s</string>
+    <!-- %1$s：Android 版本、API 级别与机型，如「Android 14 (API 34) · Pixel 7」 -->
+    <string name="error_copy_system">系统：%1$s</string>
     <string name="web_profile_missing">连接组不存在，请返回重新选择</string>
     <string name="web_close_confirm_message">关闭后返回连接组列表，可随时重新连接。</string>
 

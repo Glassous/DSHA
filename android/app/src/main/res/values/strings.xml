@@ -140,6 +140,25 @@
     <string name="web_no_browser">No app can open this link</string>
     <string name="web_download_started">Download started</string>
     <string name="web_download_failed">Download failed</string>
+    <!-- Error screen of the web shell: the code is the only thing shown on screen -->
+    <string name="action_copy_error">Copy error info</string>
+    <!-- Feedback on the copy button right after a successful copy -->
+    <string name="action_copied">Copied</string>
+    <string name="error_copy_label">Load error</string>
+    <!-- %1$s: the error code shown on screen, e.g. "404" or "-2" -->
+    <string name="error_copy_code">Error code: %1$s</string>
+    <!-- %1$s: the WebView error description, the HTTP reason phrase, or a standard phrase when the server sent none -->
+    <string name="error_copy_detail">Detail: %1$s</string>
+    <!-- %1$s: the address that failed to load -->
+    <string name="error_copy_url">Address: %1$s</string>
+    <!-- %1$s: the name of the connection that failed -->
+    <string name="error_copy_profile">Connection: %1$s</string>
+    <!-- %1$s: local time with the UTC offset, e.g. "2026-10-12 21:03:45 +08:00" -->
+    <string name="error_copy_time">Time: %1$s</string>
+    <!-- %1$s: the installed app version, e.g. "1.0.0" -->
+    <string name="error_copy_app_version">App version: %1$s</string>
+    <!-- %1$s: Android version, API level and device model, e.g. "Android 14 (API 34) · Pixel 7" -->
+    <string name="error_copy_system">System: %1$s</string>
     <string name="web_profile_missing">This connection no longer exists. Go back and choose again</string>
     <string name="web_close_confirm_message">Closing returns to the connection list; you can reconnect at any time.</string>
 

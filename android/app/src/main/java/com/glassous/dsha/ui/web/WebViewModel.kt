@@ -31,7 +31,14 @@ class WebViewModel(
 
     var progress by mutableIntStateOf(0)
 
-    var loadError by mutableStateOf(false)
+    /**
+     * 主框架加载失败：非空即进入错误态，界面据此把启动动画原位换成错误提示。
+     *
+     * 同一轮加载内首个错误生效，且只有用户主动重启加载或返回上一页才会解除
+     * （见 [reportLoadError]），因此这里读到的总是最精确、且确实还没被处理掉的那一笔。
+     */
+    var loadError by mutableStateOf<WebLoadError?>(null)
+        private set
 
     /** 网页首次加载完成（进度到 100）：启动动画进入"即将准备就绪"提示阶段。 */
     var loadFinished by mutableStateOf(false)
@@ -71,21 +78,47 @@ class WebViewModel(
      */
     fun restartLoading() {
         progress = 0
-        loadError = false
+        loadError = null
         loadFinished = false
         pageReady = false
     }
 
     /**
+     * 记录一次主框架加载失败。
+     *
+     * 错误态是"粘"的：第一个错误留下后，后续回调（包括 WebView 自己为渲染错误页而补的导航）
+     * 都不能把它抹掉，只有用户主动重启加载（[restartLoading]）或主动离开错误页
+     * （[dismissLoadError]）才解除。原因是失败后 WebView 往往还会补一次主框架导航，
+     * 若在那里清掉错误，覆盖层会立刻退回加载态，残留的 [loadFinished] 还会让"即将准备就绪"
+     * 与网页紧接着被放出来，等于错误提示一闪而过。
+     *
+     * 同一轮加载内也只认第一个错误：主框架 4xx/5xx 之后 WebView 常常再补一次通用网络错误
+     * （ERR_HTTP_RESPONSE_CODE_FAILURE），Basic 鉴权失败后也紧跟一次加载失败回调；
+     * 404 / 500 / 401 这种能对上服务端日志的错误码才不会被 -1 之类的通用码覆盖掉。
+     */
+    fun reportLoadError(error: WebLoadError) {
+        if (loadError == null) loadError = error
+    }
+
+    /** 用户主动离开错误页（返回上一页、放弃本地接管）：撤掉错误提示，不动加载序列的其它状态。 */
+    fun dismissLoadError() {
+        loadError = null
+    }
+
+    /**
      * 主框架开始了一次新导航。
      *
-     * 闸门激活期间必须复位加载序列：登录表单提交后浏览器会跳到应用页，那是全新的一次加载，
+     * 新导航意味着上一轮的"加载完成"不再代表当前页面，必须清掉：否则错误提示刚被撤下的
+     * 那一刻会残留 true，直接跳过加载阶段弹出"即将准备就绪"。
+     *
+     * 闸门激活期间还要复位整条加载序列：登录表单提交后浏览器会跳到应用页，那是全新的一次加载，
      * 要按它自己的进度重新走「进度到 100 → 停留提示 → 淡出」。不正视这一点，登录页自己那次
      * 100% 的回调会把状态提前标成"已就绪"，闸门落下时露出的就是还没渲染完的页面。
      *
-     * 闸门未激活时不动任何状态：首次加载之后，页面内导航照旧不遮挡网页。
+     * 闸门未激活时不复位 [pageReady]：首次加载之后，页面内导航照旧不遮挡网页。
      */
     fun onNavigationStarted() {
+        loadFinished = false
         if (webAuthGate != null) restartLoading()
     }
 

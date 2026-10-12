@@ -19,6 +19,7 @@ import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -55,9 +56,6 @@ enum class WebEvent {
     /** 已经尝试自动填充但页面没有跳转，提示用户手动输入。 */
     AUTOFILL_FALLBACK,
 
-    /** 外层的 HTTP Basic 鉴权未通过（账号密码不对或组里没填）。 */
-    AUTH_FAILED,
-
     NO_BROWSER,
     DOWNLOAD_STARTED,
     DOWNLOAD_FAILED,
@@ -77,6 +75,8 @@ enum class WebEvent {
  * @param safeBottomDp 导航栏高度（dp）：注入网页内部的底部安全距离；软键盘弹出时传 0（那时视图已被抬起）
  * @param onNavigationStarted 每次主框架导航开始时回调：访问认证流程中据此复位启动加载序列，
  *   让登录成功后的新页面重新完整走一遍「加载 → 就绪提示 → 撤除」
+ * @param onLoadError 主框架加载失败时回调（带错误码与出错地址）。子资源（图片、favicon）
+ *   的错误不会走到这里；错误提示是否撤下由界面层决定，这里不再回调"已清空"
  * @param onWebAuthPage 每次整页加载完成后回调访问认证页的检测结果；
  *   null 表示当前页面不是该插件的登录页（也用于「已经离开登录页」的判定）
  */
@@ -93,7 +93,7 @@ fun DshaWebView(
     onProgress: (Int) -> Unit = {},
     onCanGoBackChanged: (Boolean) -> Unit = {},
     onNavigationStarted: () -> Unit = {},
-    onLoadError: (Boolean) -> Unit = {},
+    onLoadError: (WebLoadError) -> Unit = {},
     onWebAuthPage: (WebAuthPage?) -> Unit = {},
     onBackgroundColor: (Color) -> Unit = {},
     onEvent: (WebEvent) -> Unit = {},
@@ -149,7 +149,7 @@ fun DshaWebView(
                 harnessVersion = { harnessVersionState.value },
                 onCanGoBack = { value -> onCanGoBackState.value(value) },
                 onNavigationStarted = { onNavigationStartedState.value() },
-                onLoadError = { failed -> onLoadErrorState.value(failed) },
+                onLoadError = { error -> onLoadErrorState.value(error) },
                 onWebAuthPage = { page -> onWebAuthPageState.value(page) },
                 onBackgroundColor = { color -> onBackgroundColorState.value(color) },
                 onEvent = { event -> onEventState.value(event) },
@@ -238,6 +238,9 @@ fun DshaWebView(
 
 private const val TAG = "DshaWebView"
 private const val MAX_AUTH_ATTEMPTS = 3
+
+/** 外层的 HTTP Basic 鉴权未通过：WebView 不会给出这个码，由我们自己补上。 */
+private const val HTTP_UNAUTHORIZED = 401
 private const val AUTOFILL_MAX_ATTEMPTS = 4
 private const val AUTOFILL_RETRY_DELAY_MS = 600L
 private const val AUTOFILL_FALLBACK_DELAY_MS = 4_000L
@@ -283,7 +286,7 @@ private fun buildWebViewClient(
     harnessVersion: () -> HarnessVersion,
     onCanGoBack: (Boolean) -> Unit,
     onNavigationStarted: () -> Unit,
-    onLoadError: (Boolean) -> Unit,
+    onLoadError: (WebLoadError) -> Unit,
     onWebAuthPage: (WebAuthPage?) -> Unit,
     onBackgroundColor: (Color) -> Unit,
     onEvent: (WebEvent) -> Unit,
@@ -291,6 +294,13 @@ private fun buildWebViewClient(
 
     /** 每个 host+realm 已应答的次数，防止凭据错误时陷入 401 → 应答 → 401 的死循环。 */
     private val authAttempts = mutableMapOf<String, Int>()
+
+    /**
+     * 刚放弃的 Basic 鉴权 realm。本组关闭凭据、或重试次数用尽时会先记下它，
+     * 只有主框架随后真的加载失败才把这次失败算到鉴权头上（见 [reportMainFrameError]）：
+     * 普通子资源要鉴权（例如只有 /api 单独加了保护）不该把一张正常的页面判成失败。
+     */
+    private var pendingAuthRealm: String? = null
 
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
         shouldOpenExternally(context, profile, request.url, onEvent)
@@ -308,10 +318,11 @@ private fun buildWebViewClient(
     ) {
         val key = "$host|$realm"
         val attempts = authAttempts[key] ?: 0
-        // 本组关闭凭据时一律放弃应答：站点确实需要 Basic 鉴权时会走失败流程
+        // 本组关闭凭据时一律放弃应答：站点确实需要 Basic 鉴权时会走失败流程；
+        // 归因先挂起，等主框架的失败回调到了再一起算（见 reportMainFrameError）
         if (!profile.credentialsEnabled || profile.username.isBlank() || attempts >= MAX_AUTH_ATTEMPTS) {
+            pendingAuthRealm = realm
             handler.cancel()
-            onEvent(WebEvent.AUTH_FAILED)
             return
         }
         authAttempts[key] = attempts + 1
@@ -327,7 +338,12 @@ private fun buildWebViewClient(
     }
 
     override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
-        onLoadError(false)
+        // 鉴权归因只对本轮导航有效
+        pendingAuthRealm = null
+        // 这里刻意不清错误：失败之后 WebView 常会为渲染自己的错误页再补一次 onPageStarted，
+        // 清掉就等于亲手撤掉刚显示的错误提示；紧接着进度还会走到 100，覆盖层退回加载态并
+        // 弹出"即将准备就绪"，网页也随之露出来（错误提示一闪而过）。
+        // 错误态只由用户主动重启加载或主动返回上一页解除，见 WebViewModel.reportLoadError
         // 主框架开始新一次导航：访问认证流程要据此复位启动加载序列
         onNavigationStarted()
     }
@@ -352,9 +368,61 @@ private fun buildWebViewClient(
         sampleBackgroundColor(view, safeTop(), onBackgroundColor)
     }
 
+    /**
+     * 服务器返回 4xx/5xx：WebView 不把它当加载失败——它会把错误响应体直接渲染成页面，
+     * 不在这里自行判定，用户看到的就是服务端那张错误页，而应用还以为已经加载好了。
+     * 该回调对子资源同样触发（图片、favicon 的 404），只有主框架才算加载失败。
+     */
+    override fun onReceivedHttpError(
+        view: WebView,
+        request: WebResourceRequest,
+        errorResponse: WebResourceResponse,
+    ) {
+        if (!request.isForMainFrame || errorResponse.statusCode < 400) return
+        Log.w(TAG, "HTTP ${errorResponse.statusCode} ${errorResponse.reasonPhrase} ${request.url}")
+        reportMainFrameError(
+            kind = WebErrorKind.Http,
+            code = errorResponse.statusCode.toString(),
+            detail = errorResponse.reasonPhrase.orEmpty(),
+            url = request.url.toString(),
+        )
+    }
+
     override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-        if (request.isForMainFrame) onLoadError(true)
+        if (request.isForMainFrame) {
+            reportMainFrameError(
+                kind = WebErrorKind.Network,
+                code = error.errorCode.toString(),
+                detail = error.description.toString(),
+                url = request.url.toString(),
+            )
+        }
         Log.w(TAG, "请求失败 ${error.errorCode} ${error.description} ${request.url}")
+    }
+
+    /**
+     * 主框架加载失败的唯一出口。同一轮加载内首个错误生效由 ViewModel 保证，
+     * 这里只负责给出最精确的那一笔。
+     *
+     * 刚放弃过 Basic 鉴权且失败出在网络层时，根因就是鉴权：错误码改用 401，
+     * 因为 WebView 给的通用错误码（如 -1）既对不上服务端日志，也没法告诉用户去改账号密码。
+     * 已经有明确 HTTP 状态码时不做替换，4xx/5xx 本身就是最精确的答案。
+     */
+    private fun reportMainFrameError(
+        kind: WebErrorKind,
+        code: String,
+        detail: String,
+        url: String?,
+    ) {
+        val realm = pendingAuthRealm
+        pendingAuthRealm = null
+        onLoadError(
+            if (realm != null && kind == WebErrorKind.Network) {
+                WebLoadError(WebErrorKind.Auth, HTTP_UNAUTHORIZED.toString(), realm, url)
+            } else {
+                WebLoadError(kind, code, detail, url)
+            },
+        )
     }
 
     override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
