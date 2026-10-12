@@ -3,14 +3,12 @@ package com.glassous.dsha.ui.profile
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
@@ -23,7 +21,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -84,7 +81,13 @@ fun ProfileEditScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = {
+                            // 返回前兜底：不等实时保存的合并窗口，等待中的修改立刻交给落盘
+                            viewModel.flush()
+                            onBack()
+                        },
+                    ) {
                         Icon(
                             painter = painterResource(R.drawable.ic_arrow_back),
                             contentDescription = stringResource(R.string.cd_back),
@@ -147,18 +150,7 @@ fun ProfileEditScreen(
                 onPickVersion = { versionPickerVisible = true },
             )
 
-            Button(
-                onClick = { viewModel.save(onBack) },
-                enabled = !viewModel.saving,
-                shape = RoundedCornerShape(20.dp),
-                contentPadding = PaddingValues(vertical = 14.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.action_save))
-            }
-
-            Spacer(Modifier.height(16.dp))
-            // 底部安全距离：作为内容末尾的留白随滚动移动——滚到底时最后一项（保存按钮）
+            // 底部安全距离：作为内容末尾的留白随滚动移动——滚到底时最后一项
             // 停在小白条之上，滚动过程中内容则一直延伸到屏幕底边（沉浸）
             Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
         }
